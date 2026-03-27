@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<!--
+  ╔══════════════════════════════════════════════════════════════════╗
+  ║                     TRAINING TRACKER                            ║
+  ║                  Dokumentierte Version                          ║
+  ╠══════════════════════════════════════════════════════════════════╣
+  ║                                                                  ║
+  ║  WAS DIESE APP MACHT:                                            ║
+  ║  Eine mobile Web-App zum Erfassen von Trainingseinheiten.        ║
+  ║  Der Nutzer wählt eine Trainingsart, Übungen und Sätze,         ║
+  ║  und sendet die Daten am Ende an Google Sheets.                  ║
+  ║                                                                  ║
+  ║  WIE SIE FUNKTIONIERT (Überblick):                              ║
+  ║                                                                  ║
+  ║  [Browser / Handy]                                               ║
+  ║       │                                                          ║
+  ║       │  Nutzer tippt Daten ein                                  ║
+  ║       ▼                                                          ║
+  ║  [JavaScript im Browser]                                         ║
+  ║       │  speichert alles im "state"-Objekt (Arbeitsspeicher)     ║
+  ║       │                                                          ║
+  ║       │  beim Speichern: sendet JSON per HTTP POST               ║
+  ║       ▼                                                          ║
+  ║  [Google Apps Script Web-App]                                    ║
+  ║       │  empfängt die Daten, liest JSON aus                      ║
+  ║       ▼                                                          ║
+  ║  [Google Sheets]                                                 ║
+  ║       Eine Zeile pro Satz wird eingetragen                       ║
+  ║                                                                  ║
+  ╚══════════════════════════════════════════════════════════════════╝
+-->
+<html lang="de">
+<head>
+
+  <!--
+    ═══════════════════════════════════════════════
+    HEAD-BEREICH
+    ═══════════════════════════════════════════════
+    Der <head> ist unsichtbar für den Nutzer.
+    Hier werden Metadaten, Schriften und Styles geladen.
+  -->
+
+  <!-- Zeichenkodierung: UTF-8 erlaubt Umlaute (ä, ö, ü) -->
+  <meta charset="UTF-8">
+
+  <!--
+    viewport: Wichtig für mobile Geräte!
+    - width=device-width  → Breite = Bildschirmbreite (kein Zoom-out)
+    - initial-scale=1.0   → Startzoom = 100%
+    - maximum-scale=1.0   → Verhindert automatisches Reinzoomen beim Tippen
+    - user-scalable=no    → Nutzer kann nicht manuell zoomen
+  -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+  <title>Training Tracker</title>
+
+  <!--
+    Google Fonts: Zwei externe Schriftarten werden geladen.
+    - Bebas Neue: Großbuchstaben-Display-Schrift für Überschriften
+    - DM Sans: Moderne, gut lesbare Schrift für Fließtext
+    wght=300;400;500;600 = verschiedene Schriftstärken (dünn bis halbfett)
+  -->
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    /*
+      ═══════════════════════════════════════════════
+      CSS – DESIGN & LAYOUT
+      ═══════════════════════════════════════════════
+
+      CSS (Cascading Style Sheets) beschreibt WIE Elemente aussehen.
+      HTML beschreibt WAS da ist – CSS macht es schön.
+
+      Grundprinzip: selector { eigenschaft: wert; }
+      Beispiel:     body    { background: black; }
+    */
+
+    /*
+      ── CSS VARIABLEN (Custom Properties) ──────────────
+      Variablen beginnen mit "--" und werden mit :root definiert.
+      :root = das oberste Element der Seite (wie eine globale Variable)
+
+      VORTEIL: Farbe nur an EINER Stelle ändern → ändert sich überall.
+      Verwendung: color: var(--accent);
+    */
+    :root {
+      --bg:      #0d0d0d;  /* Hintergrundfarbe (fast schwarz) */
+      --surface: #1a1a1a;  /* Kartenfarbe (etwas heller) */
+      --surface2:#242424;  /* Noch eine Ebene heller (für Inputs) */
+      --border:  #2e2e2e;  /* Rahmenfarbe (dunkelgrau) */
+      --accent:  #e8ff47;  /* Akzentfarbe (Neon-Gelb) – für Buttons, Highlights */
+      --accent2: #ff5c3a;  /* Zweite Akzentfarbe (Orange-Rot) – für Fehler/Löschen */
+      --text:    #f0f0f0;  /* Textfarbe (fast weiß) */
+      --muted:   #888;     /* Gedämpfte Textfarbe (grau) – für Labels, Hinweise */
+      --radius:  14px;     /* Abrundungsradius für Ecken */
+    }
+
+    /*
+      ── RESET ───────────────────────────────────────────
+      * = betrifft ALLE Elemente auf der Seite.
+
+      box-sizing: border-box → Padding und Border werden IN die Breite eingerechnet,
+        nicht zusätzlich. Macht Layouts viel berechenbarer.
+      margin/padding: 0 → Browser fügen standardmäßig Abstände hinzu – wir setzen sie zurück.
+      -webkit-tap-highlight-color: transparent → entfernt den blauen Tap-Effekt auf iOS/Android.
+    */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /*
+      ── BODY (Seitencontainer) ───────────────────────────
+      min-height: 100dvh → mindestens so hoch wie der Viewport
+        dvh = "dynamic viewport height" – berücksichtigt die mobile Browser-Adressleiste
+      display: flex; flex-direction: column → Elemente untereinander anordnen
+      align-items: center → horizontal zentrieren
+      padding-bottom: 80px → Abstand unten (damit letzter Button nicht am Rand klebt)
+    */
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 0 80px;
+    }
+
+    /* ── HEADER (Kopfzeile) ─────────────────────────────
+       justify-content: space-between → Logo links, Datum rechts
+    */
+    header {
+      width: 100%;
+      padding: 28px 20px 12px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* Logo-Schrift: Bebas Neue, Neon-Gelb, großer Buchstabenabstand */
+    .logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 2rem;
+      letter-spacing: 2px;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    /* Datumsanzeige oben rechts: kleines Pill-Design */
+    .date-badge {
+      font-size: 0.75rem;
+      color: var(--muted);
+      background: var(--surface2);
+      padding: 4px 10px;
+      border-radius: 20px;  /* stark abgerundet = "Pill"-Form */
+      border: 1px solid var(--border);
+    }
+
+    /*
+      ── SCREENS (Bildschirme / Seiten) ───────────────────
+      Die App hat 3 "Screens" die ein- und ausgeblendet werden.
+      Standardmäßig: display: none → unsichtbar
+      Mit Klasse "active": display: flex → sichtbar
+
+      max-width: 480px → auf großen Bildschirmen nicht breiter als 480px
+      gap: 16px → Abstand zwischen Kind-Elementen
+    */
+    .screen { width: 100%; max-width: 480px; padding: 24px 20px; display: none; flex-direction: column; gap: 16px; }
+    .screen.active { display: flex; }
+
+    /*
+      ── SCHRITT-ANZEIGE (Step Indicator) ─────────────────
+      Die drei Punkte oben (Schritt 1 / 2 / 3).
+      .done = abgeschlossen (gelb)
+      .active = aktueller Schritt (gelb + breiter = Pill-Form)
+      transition: weiche Animation beim Statuswechsel
+    */
+    .steps { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+    .step-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); transition: background 0.3s; }
+    .step-dot.done   { background: var(--accent); }
+    .step-dot.active { background: var(--accent); width: 24px; border-radius: 4px; }
+
+    /* ── SECTION LABEL (Große Überschriften) ─────────────
+       font-size: 1.7rem = 1.7 × 16px = ~27px
+       span innerhalb → Neon-Gelb einfärben
+    */
+    .section-label { font-family: 'Bebas Neue', sans-serif; font-size: 1.7rem; letter-spacing: 1px; color: var(--text); line-height: 1.1; }
+    .section-label span { color: var(--accent); }
+
+    /*
+      ── CARD GRID (Trainingsart-Karten) ──────────────────
+      display: grid → CSS Grid Layout
+      grid-template-columns: 1fr 1fr → zwei gleich breite Spalten
+        (1fr = "1 fraction" = anteilige Breite)
+      .single → eine Spalte (für Sonderfälle)
+    */
+    .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .card-grid.single { grid-template-columns: 1fr; }
+
+    /*
+      ── TYPE CARD (Trainingsart-Karte) ────────────────────
+      cursor: pointer → Mauszeiger wird zur Hand
+      transition: → animiert Farbwechsel (0.2s) und Skalierung (0.1s)
+      :active → beim Drücken (Finger/Maus): leicht verkleinern
+      :hover → beim Drüberfahren: Rahmen + Hintergrund ändern
+    */
+    .type-card {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 16px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s, transform 0.1s;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .type-card:active { transform: scale(0.97); }
+    .type-card.selected, .type-card:hover { border-color: var(--accent); background: #1e2200; }
+    .type-card .icon { font-size: 1.5rem; }
+    .type-card .name { font-weight: 600; font-size: 1rem; }
+    .type-card .sub  { font-size: 0.75rem; color: var(--muted); }
+
+    /* ── ÜBUNGS-BUTTONS ──────────────────────────────────
+       width: 100% → volle Breite
+       Gleiche Hover/Active-Effekte wie type-card
+    */
+    .exercise-btn {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--text);
+      text-align: left;
+      transition: border-color 0.2s, background 0.2s, transform 0.1s;
+      width: 100%;
+    }
+    .exercise-btn:active { transform: scale(0.98); }
+    .exercise-btn.selected, .exercise-btn:hover { border-color: var(--accent); background: #1e2200; color: var(--accent); }
+
+    /* ── INPUT BEREICH ───────────────────────────────────
+       Zwei Eingabefelder nebeneinander (Gewicht | Wdh)
+    */
+    .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .input-group { display: flex; flex-direction: column; gap: 6px; }
+
+    /* Labels über den Inputs: kleine Großbuchstaben */
+    .input-group label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-transform: uppercase;  /* alles groß */
+      letter-spacing: 1px;
+      font-weight: 500;
+    }
+
+    /*
+      Eingabefelder:
+      font-size: 1.5rem → große Zahl, gut lesbar
+      text-align: center → Zahl mittig
+      -webkit-appearance: none → entfernt Standard-Browser-Styling (z.B. Spinner-Pfeile)
+      :focus → wenn aktiv (angeklickt): gelber Rahmen
+    */
+    .input-group input {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 600;
+      padding: 14px;
+      width: 100%;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+    }
+    .input-group input:focus { border-color: var(--accent); }
+
+    /* ── SATZ-LOG (Liste der eingetragenen Sätze) ─────────
+       CSS Grid mit 4 Spalten: Nummer | KG | WDH | Löschen
+       32px = fixe Breite für # und ✕
+       1fr = flexibel für Gewicht und Wdh
+    */
+    .sets-log { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; }
+    .sets-log-header { display: grid; grid-template-columns: 32px 1fr 1fr 32px; padding: 8px 14px; font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); }
+    .set-row { display: grid; grid-template-columns: 32px 1fr 1fr 32px; padding: 10px 14px; font-size: 0.9rem; border-bottom: 1px solid var(--border); align-items: center; animation: slideIn 0.2s ease; }
+    .set-row:last-child { border-bottom: none; }
+    .set-num { color: var(--accent); font-weight: 700; font-size: 0.85rem; }
+    .set-val { font-weight: 600; text-align: center; }
+    .del-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; padding: 2px; text-align: right; }
+    .del-btn:hover { color: var(--accent2); }
+
+    /*
+      ── ANIMATION: slideIn ────────────────────────────────
+      @keyframes definiert eine CSS-Animation.
+      "slideIn" → neuer Satz erscheint mit kleinem Slide-Effekt von oben.
+      from = Startzustand, to = Endzustand
+      opacity: 0→1 = einblenden
+      translateY(-6px)→(0) = 6px nach unten gleiten
+    */
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /*
+      ── BUTTONS ───────────────────────────────────────────
+      Drei Varianten:
+      .btn-primary  → gelb ausgefüllt (Hauptaktion)
+      .btn-secondary→ transparent mit Rahmen (Nebenaktionen)
+      .btn-danger   → rot/orange (destruktive Aktionen wie "Neu starten")
+    */
+    .btn-primary {
+      background: var(--accent);
+      color: #0d0d0d;  /* dunkler Text auf hellem Hintergrund */
+      border: none;
+      border-radius: var(--radius);
+      padding: 16px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.2rem;
+      letter-spacing: 1.5px;
+      cursor: pointer;
+      width: 100%;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn-primary:active   { transform: scale(0.98); opacity: 0.9; }
+    .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }  /* ausgegraut wenn deaktiviert */
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      width: 100%;
+      transition: border-color 0.2s, transform 0.1s;
+    }
+    .btn-secondary:active { transform: scale(0.98); }
+    .btn-secondary:hover  { border-color: var(--accent); color: var(--accent); }
+
+    .btn-danger {
+      background: transparent;
+      color: var(--accent2);
+      border: 1.5px solid var(--accent2);
+      border-radius: var(--radius);
+      padding: 14px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      width: 100%;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn-danger:active { transform: scale(0.98); background: rgba(255,92,58,0.1); }
+
+    /* Zwei Buttons nebeneinander */
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    /*
+      ── TOAST (Kurz-Benachrichtigung) ─────────────────────
+      position: fixed → bleibt an fixer Position, egal wie gescrollt wird
+      left: 50% + transform: translateX(-50%) → horizontale Zentrierung
+      translateY(80px) → startet unterhalb des Bildschirms (unsichtbar)
+      .show → translateY(0) → gleitet ins Bild
+      cubic-bezier → angepasste Easing-Kurve für "Bounce"-Effekt
+    */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);  /* startposition: unten versteckt */
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 30px;
+      padding: 12px 22px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;  /* kein Zeilenumbruch */
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      z-index: 99;  /* immer ganz oben */
+    }
+    .toast.show    { transform: translateX(-50%) translateY(0); }  /* eingeblendet */
+    .toast.success { border-color: var(--accent);  color: var(--accent);  }
+    .toast.error   { border-color: var(--accent2); color: var(--accent2); }
+
+    /* ── ZUSAMMENFASSUNG ──────────────────────────────────
+       Anzeige aller Übungen + Sätze am Ende des Trainings
+    */
+    .summary-block { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .summary-exercise { display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .summary-exercise:last-child { border-bottom: none; }
+    .summary-ex-name { font-weight: 600; font-size: 0.9rem; }
+    .summary-ex-sets { font-size: 0.78rem; color: var(--muted); margin-top: 3px; }
+    .summary-count   { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; color: var(--accent); }
+
+    /* ── WEBHOOK EINGABE ──────────────────────────────────
+       Gestrichelter Rahmen (border: dashed) signalisiert
+       "optionale / technische" Eingabe
+    */
+    .webhook-section { background: var(--surface2); border-radius: var(--radius); border: 1px dashed var(--border); padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .webhook-section label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+    .webhook-section input { background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 0.85rem; padding: 12px; width: 100%; outline: none; transition: border-color 0.2s; }
+    .webhook-section input:focus { border-color: var(--accent); }
+    .webhook-hint { font-size: 0.72rem; color: var(--muted); }
+
+    /* ── SPINNER (Ladeanimation) ──────────────────────────
+       Ein Kreis, bei dem ein Viertel transparent ist.
+       animation: spin → dreht sich kontinuierlich (linear = gleichmäßig)
+    */
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #0d0d0d; border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── AKTUELLE ÜBUNG BADGE ─────────────────────────────
+       Grüner Hintergrund + gelber Rand zeigt aktive Übung
+       .dot = kleiner Kreis als visueller Indikator
+    */
+    .current-exercise-badge { background: #1e2200; border: 1px solid var(--accent); border-radius: 8px; padding: 8px 14px; font-size: 0.85rem; color: var(--accent); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .current-exercise-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+
+  </style>
+</head>
+<body>
+
+  <!--
+    ═══════════════════════════════════════════════
+    HTML – STRUKTUR DER APP
+    ═══════════════════════════════════════════════
+
+    Die App besteht aus:
+    1. <header>   → Logo + Datum (immer sichtbar)
+    2. #screen-type     → Screen 1: Trainingsart wählen
+    3. #screen-exercise → Screen 2: Übungen + Sätze
+    4. #screen-summary  → Screen 3: Zusammenfassung + Speichern
+    5. .toast           → Benachrichtigungsblase
+
+    Nur jeweils ein Screen hat die CSS-Klasse "active" → ist sichtbar.
+    JavaScript wechselt diese Klasse per showScreen().
+  -->
+
+  <header>
+    <div class="logo">LOGBOOK</div>
+    <!-- Datum wird per JavaScript befüllt (siehe Init unten) -->
+    <div class="date-badge" id="dateBadge"></div>
+  </header>
+
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 1: Trainingsart wählen
+       ══════════════════════════════════════════
+       Startet mit class="active" → erster sichtbarer Screen.
+       onclick="selectType('Beine')" → ruft JavaScript-Funktion auf.
+  -->
+  <div class="screen active" id="screen-type">
+
+    <!-- Schritt-Indikator: Punkt 1 ist aktiv -->
+    <div class="steps">
+      <div class="step-dot active"></div>
+      <div class="step-dot"></div>
+      <div class="step-dot"></div>
+    </div>
+
+    <div class="section-label">Was trainierst<br><span>du heute?</span></div>
+
+    <!-- 2-Spalten-Grid mit den drei Trainingsarten -->
+    <div class="card-grid">
+      <div class="type-card" onclick="selectType('Beine')">
+        <div class="icon">🦵</div>
+        <div class="name">Beine</div>
+        <div class="sub">4 Übungen</div>
+      </div>
+      <div class="type-card" onclick="selectType('Brust')">
+        <div class="icon">💪</div>
+        <div class="name">Brust</div>
+        <div class="sub">4 Übungen</div>
+      </div>
+      <div class="type-card" onclick="selectType('Rücken')">
+        <div class="icon">🏋️</div>
+        <div class="name">Rücken</div>
+        <div class="sub">4 Übungen</div>
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 2: Übung wählen + Sätze erfassen
+       ══════════════════════════════════════════
+       Dieser Screen hat zwei Zustände:
+       A) Übungsauswahl: Buttons werden per JS eingefügt
+       B) Satzeingabe: erscheint nach Übungsauswahl
+  -->
+  <div class="screen" id="screen-exercise">
+
+    <!-- Schritt-Indikator: Punkt 1 fertig, Punkt 2 aktiv -->
+    <div class="steps">
+      <div class="step-dot done"></div>
+      <div class="step-dot active"></div>
+      <div class="step-dot"></div>
+    </div>
+
+    <!-- Titel wird per JS dynamisch gesetzt (z.B. "Beine – Übung wählen") -->
+    <div class="section-label" id="exerciseScreenTitle">Übung wählen</div>
+
+    <!--
+      Übungs-Buttons: LEER im HTML!
+      Sie werden per JavaScript (renderExerciseButtons) dynamisch eingefügt.
+      Warum? Weil wir erst nach Trainingsartwahl wissen, welche Übungen kommen.
+    -->
+    <div id="exerciseButtons"></div>
+
+    <!--
+      Satzeingabe-Bereich: startet unsichtbar (display:none).
+      Wird nach Übungsauswahl per JS eingeblendet.
+    -->
+    <div id="setInputSection" style="display:none; flex-direction:column; gap:14px;">
+
+      <!-- Zeigt welche Übung gerade aktiv ist -->
+      <div class="current-exercise-badge">
+        <div class="dot"></div>
+        <span id="currentExerciseName"></span>
+      </div>
+
+      <!-- Zwei Eingabefelder: Gewicht und Wiederholungen -->
+      <div class="input-row">
+        <div class="input-group">
+          <label>Gewicht (kg)</label>
+          <!--
+            type="number"    → numerische Tastatur auf Mobilgeräten
+            inputmode="decimal" → erlaubt Dezimalzahlen (z.B. 82.5)
+            step="0.5"       → Pfeiltasten erhöhen/senken um 0.5
+          -->
+          <input type="number" id="inputWeight" placeholder="80" min="0" step="0.5" inputmode="decimal">
+        </div>
+        <div class="input-group">
+          <label>Wiederholungen</label>
+          <!--
+            inputmode="numeric" → nur Ganzzahlen-Tastatur
+          -->
+          <input type="number" id="inputReps" placeholder="10" min="1" inputmode="numeric">
+        </div>
+      </div>
+
+      <!-- Liste der eingetragenen Sätze (startet leer) -->
+      <div id="setsLog" style="display:none;">
+        <div class="sets-log">
+          <div class="sets-log-header">
+            <span>#</span>
+            <span style="text-align:center">KG</span>
+            <span style="text-align:center">WDH</span>
+            <span></span>
+          </div>
+          <!-- Satz-Zeilen werden per JS hier eingefügt -->
+          <div id="setsLogRows"></div>
+        </div>
+      </div>
+
+      <!-- Satz hinzufügen → ruft addSet() auf -->
+      <button class="btn-primary" onclick="addSet()">+ Satz hinzufügen</button>
+
+      <div class="btn-row">
+        <!-- Übung wechseln ohne zu speichern → changeExercise() -->
+        <button class="btn-secondary" onclick="changeExercise()">Übung wechseln</button>
+        <!--
+          disabled → startet deaktiviert, wird nach erstem Satz aktiv
+          finishExercise() → speichert Übung in state, zeigt Zusammenfassung
+        -->
+        <button class="btn-secondary" id="finishExBtn" onclick="finishExercise()" disabled>Übung fertig ✓</button>
+      </div>
+
+    </div>
+
+    <!-- Button zum Abschließen erscheint nach erster fertiger Übung -->
+    <div id="noExerciseYet" style="padding: 8px 0;">
+      <button class="btn-secondary" onclick="goToSummary()" id="goSummaryBtn" style="display:none">
+        Training abschließen →
+      </button>
+    </div>
+
+  </div>
+
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 3: Zusammenfassung + Speichern
+       ══════════════════════════════════════════
+  -->
+  <div class="screen" id="screen-summary">
+
+    <!-- Schritt-Indikator: Punkte 1+2 fertig, Punkt 3 aktiv -->
+    <div class="steps">
+      <div class="step-dot done"></div>
+      <div class="step-dot done"></div>
+      <div class="step-dot active"></div>
+    </div>
+
+    <div class="section-label">Training<br><span>Zusammenfassung</span></div>
+
+    <!-- Wird per renderSummary() mit Übungen + Sätzen befüllt -->
+    <div class="summary-block" id="summaryContent"></div>
+
+    <!-- URL-Eingabe für Google Apps Script -->
+    <div class="webhook-section">
+      <label>Google Apps Script Web-App-URL</label>
+      <input type="url" id="webhookUrl"
+             placeholder="https://script.google.com/macros/s/..."
+             value="">
+      <div class="webhook-hint">
+        Die URL deiner Google Apps Script Web-App einfügen. Wird lokal gespeichert.
+      </div>
+    </div>
+
+    <!-- Speichern → saveTraining() sendet Daten an Apps Script -->
+    <button class="btn-primary" id="saveBtn" onclick="saveTraining()">
+      Training speichern →
+    </button>
+
+    <!-- Neues Training → resetAll() setzt alles zurück -->
+    <button class="btn-danger" onclick="resetAll()">
+      Neues Training starten
+    </button>
+
+  </div>
+
+  <!-- Toast: unsichtbar, wird per showToast() eingeblendet -->
+  <div class="toast" id="toast"></div>
+
+
+  <script>
+    /*
+      ═══════════════════════════════════════════════
+      JAVASCRIPT – LOGIK DER APP
+      ═══════════════════════════════════════════════
+
+      JavaScript macht die App interaktiv.
+      HTML = Struktur, CSS = Aussehen, JS = Verhalten.
+
+      Grundprinzip:
+      1. Nutzer tut etwas (klickt, tippt)
+      2. Event-Handler wird aufgerufen (onclick, addEventListener)
+      3. Funktion verändert den "state" (Datenspeicher)
+      4. UI wird neu gerendert (DOM-Manipulation)
+    */
+
+
+    /*
+      ── ÜBUNGSDATEN (Konfiguration) ──────────────────────
+      Ein Objekt mit drei Arrays – einer pro Trainingsart.
+
+      Objekt-Syntax:  { schlüssel: wert }
+      Array-Syntax:   [ element1, element2 ]
+
+      EXERCISES['Beine'] → gibt das Array mit Bein-Übungen zurück.
+
+      Hier kannst du Übungen einfach hinzufügen oder entfernen!
+    */
+    const EXERCISES = {
+      'Beine':  ['Squats', 'LH Schulterdrücken', 'RDL', 'Seitheben am Kabel'],
+      'Brust':  ['Bench', 'Dips', 'Schrägbankdrücken', 'Überkopfzüge'],
+      'Rücken': ['Klimmzüge', 'LH Curls', 'Einarm Rudern', 'Kabelcurls']
+    };
+
+
+    /*
+      ── STATE (Zustandsspeicher) ──────────────────────────
+      Der "state" ist das Herzstück der App.
+      Er speichert alles was der Nutzer bisher eingegeben hat.
+
+      type              → gewählte Trainingsart ('Beine', 'Brust', 'Rücken')
+      currentExercise   → gerade aktive Übung (String)
+      currentSets       → Sätze der aktuellen Übung (Array)
+      completedExercises→ alle fertigen Übungen mit ihren Sätzen (Array)
+
+      Beispiel nach 2 Sätzen Bench:
+      state = {
+        type: 'Brust',
+        currentExercise: 'Bench',
+        currentSets: [
+          { weight: 80, reps: 8 },
+          { weight: 85, reps: 6 }
+        ],
+        completedExercises: []
+      }
+    */
+    let state = {
+      type: null,
+      currentExercise: null,
+      currentSets: [],
+      completedExercises: [],
+    };
+
+
+    /*
+      ── INITIALISIERUNG ───────────────────────────────────
+      Wird beim Laden der Seite einmalig ausgeführt (kein Trigger nötig,
+      da es direkt auf oberster Ebene steht – nicht in einer Funktion).
+
+      1. Datum in den Header schreiben
+      2. Gespeicherte Webhook-URL aus localStorage laden
+    */
+
+    // Datum formatieren und einfügen
+    // toLocaleDateString('de-DE', ...) → "Fr, 27. Mär"
+    document.getElementById('dateBadge').textContent =
+      new Date().toLocaleDateString('de-DE', {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short'
+      });
+
+    /*
+      localStorage ist ein einfacher Key-Value-Speicher im Browser.
+      Daten bleiben gespeichert, auch wenn die Seite geschlossen wird.
+      Nützlich für Einstellungen, die der Nutzer nicht jedes Mal neu eingeben soll.
+
+      localStorage.getItem('key')   → lesen
+      localStorage.setItem('key', value) → schreiben (in saveTraining)
+    */
+    const savedWebhook = localStorage.getItem('webhookUrl');
+    if (savedWebhook) {
+      document.getElementById('webhookUrl').value = savedWebhook;
+    }
+
+
+    /*
+      ── showScreen(id) ────────────────────────────────────
+      Wechselt den sichtbaren Screen.
+
+      1. Alle Screens: "active" entfernen → alle unsichtbar
+      2. Gewünschter Screen: "active" hinzufügen → sichtbar
+      3. Zum Seitenanfang scrollen (smooth = animiert)
+
+      document.querySelectorAll('.screen') → alle Elemente mit Klasse "screen"
+      forEach → für jedes Element ausführen
+      classList.remove/add → CSS-Klasse entfernen/hinzufügen
+    */
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+
+    /*
+      ── selectType(type) ──────────────────────────────────
+      Aufgerufen wenn Nutzer eine Trainingsart antippt.
+
+      1. state zurücksetzen (neues Training)
+      2. Überschrift des nächsten Screens setzen
+      3. Übungs-Buttons rendern
+      4. Eingabebereich und Abschluss-Button verstecken
+      5. Zu Screen 2 wechseln
+    */
+    function selectType(type) {
+      // State aktualisieren
+      state.type = type;
+      state.currentExercise = null;
+      state.currentSets = [];
+      state.completedExercises = [];
+
+      // Template Literal: Backtick-String mit ${...} für Variablen
+      document.getElementById('exerciseScreenTitle').innerHTML =
+        `<span>${type}</span> –<br>Übung wählen`;
+
+      renderExerciseButtons();
+
+      // Bereiche verstecken
+      document.getElementById('setInputSection').style.display = 'none';
+      document.getElementById('goSummaryBtn').style.display = 'none';
+
+      showScreen('screen-exercise');
+    }
+
+
+    /*
+      ── renderExerciseButtons() ───────────────────────────
+      Erstellt die Übungs-Buttons dynamisch per JavaScript.
+      Wird aufgerufen nach Trainingsartwahl und nach jeder Übungsfertigstellung.
+
+      WARUM dynamisch statt festes HTML?
+      → Wir wissen erst zur Laufzeit welche Trainingsart gewählt wurde.
+      → Fertige Übungen sollen anders dargestellt werden (✓ + Satzanzahl).
+
+      DOM-Manipulation:
+      document.createElement('button') → neues Button-Element erstellen
+      container.appendChild(btn)       → in den Container einhängen
+      container.innerHTML = ''         → Container leeren (vor Neubau)
+    */
+    function renderExerciseButtons() {
+      const container = document.getElementById('exerciseButtons');
+
+      // Übungen für die gewählte Trainingsart
+      const exercises = EXERCISES[state.type];
+
+      // Namen der bereits fertigen Übungen (für Styling)
+      const doneNames = state.completedExercises.map(e => e.name);
+
+      // Container leeren
+      container.innerHTML = '';
+
+      // Für jede Übung einen Button erstellen
+      exercises.forEach(ex => {
+        const btn = document.createElement('button');
+
+        // Klasse: "exercise-btn" + optional " selected" wenn fertig
+        btn.className = 'exercise-btn' + (doneNames.includes(ex) ? ' selected' : '');
+        btn.style.marginBottom = '8px';
+
+        // Ternärer Operator: bedingung ? wennWahr : wennFalsch
+        btn.innerHTML = doneNames.includes(ex)
+          ? `✓ ${ex} <span style="color:var(--muted);font-size:0.8rem">(${state.completedExercises.find(e => e.name === ex).sets.length} Sätze)</span>`
+          : ex;
+
+        // Nur nicht-fertige Übungen sind klickbar
+        if (!doneNames.includes(ex)) {
+          // Arrow Function: () => ... (kurze Schreibweise für function())
+          btn.onclick = () => selectExercise(ex);
+        }
+
+        container.appendChild(btn);
+      });
+    }
+
+
+    /*
+      ── selectExercise(name) ──────────────────────────────
+      Aufgerufen wenn Nutzer eine Übung antippt.
+
+      1. Übung in state speichern
+      2. Satz-Liste zurücksetzen
+      3. Eingabebereich einblenden und befüllen
+      4. "Fertig"-Button deaktivieren (braucht mindestens 1 Satz)
+      5. Zum Eingabebereich scrollen
+    */
+    function selectExercise(name) {
+      state.currentExercise = name;
+      state.currentSets = [];
+
+      // Badge mit Übungsname aktualisieren
+      document.getElementById('currentExerciseName').textContent = name;
+
+      // Eingabebereich einblenden
+      document.getElementById('setInputSection').style.display = 'flex';
+      document.getElementById('setsLog').style.display = 'none';
+      document.getElementById('setsLogRows').innerHTML = '';
+
+      // Felder leeren
+      document.getElementById('inputWeight').value = '';
+      document.getElementById('inputReps').value = '';
+
+      // "Übung fertig"-Button deaktivieren
+      document.getElementById('finishExBtn').disabled = true;
+
+      // Buttons neu rendern (aktive Übung hervorheben)
+      renderExerciseButtons();
+
+      // Sanftes Scrollen zum Eingabebereich (kurze Verzögerung nötig)
+      setTimeout(() => {
+        document.getElementById('setInputSection').scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }, 100);
+    }
+
+
+    /*
+      ── addSet() ──────────────────────────────────────────
+      Fügt einen neuen Satz zur aktuellen Übung hinzu.
+
+      1. Werte aus den Inputs lesen
+      2. Validierung (beide Felder müssen ausgefüllt sein)
+      3. Satz-Objekt in state.currentSets pushen
+      4. Satz-Liste neu rendern
+      5. "Übung fertig"-Button aktivieren
+      6. Wiederholungsfeld leeren und fokussieren (für schnelle Eingabe)
+
+      parseFloat → String zu Dezimalzahl ("80.5" → 80.5)
+      parseInt   → String zu Ganzzahl ("10" → 10)
+    */
+    function addSet() {
+      const weight = document.getElementById('inputWeight').value;
+      const reps   = document.getElementById('inputReps').value;
+
+      // Validierung: Fehlermeldung wenn leer
+      if (!weight || !reps) {
+        showToast('Gewicht und Wiederholungen eingeben', 'error');
+        return;  // Funktion abbrechen
+      }
+
+      // Satz-Objekt zum Array hinzufügen
+      // push() fügt Element ans Ende des Arrays
+      state.currentSets.push({
+        weight: parseFloat(weight),
+        reps:   parseInt(reps)
+      });
+
+      // UI aktualisieren
+      renderSetsLog();
+      document.getElementById('finishExBtn').disabled = false;
+
+      // Wdh-Feld leeren und Fokus setzen (direkt nächsten Satz eingeben)
+      document.getElementById('inputReps').value = '';
+      document.getElementById('inputReps').focus();
+    }
+
+
+    /*
+      ── renderSetsLog() ───────────────────────────────────
+      Rendert die Liste der eingetragenen Sätze.
+
+      forEach mit Index: array.forEach((element, index) => ...)
+      Template Literal für HTML-String mit eingebetteten Variablen.
+    */
+    function renderSetsLog() {
+      const rows = document.getElementById('setsLogRows');
+      rows.innerHTML = '';  // leeren
+
+      state.currentSets.forEach((s, i) => {
+        const row = document.createElement('div');
+        row.className = 'set-row';
+
+        // onclick="deleteSet(${i})" → inline Event-Handler mit Index
+        row.innerHTML = `
+          <span class="set-num">${i + 1}</span>
+          <span class="set-val">${s.weight} kg</span>
+          <span class="set-val">${s.reps} ×</span>
+          <button class="del-btn" onclick="deleteSet(${i})">✕</button>
+        `;
+        rows.appendChild(row);
+      });
+
+      // Satz-Log nur anzeigen wenn mindestens 1 Satz vorhanden
+      document.getElementById('setsLog').style.display =
+        state.currentSets.length > 0 ? 'block' : 'none';
+    }
+
+
+    /*
+      ── deleteSet(i) ──────────────────────────────────────
+      Löscht einen Satz aus der Liste.
+
+      splice(index, anzahl) → entfernt "anzahl" Elemente ab "index"
+      splice(2, 1) → löscht das Element an Position 2
+    */
+    function deleteSet(i) {
+      state.currentSets.splice(i, 1);
+      renderSetsLog();
+
+      // "Fertig"-Button deaktivieren wenn keine Sätze mehr
+      if (state.currentSets.length === 0) {
+        document.getElementById('finishExBtn').disabled = true;
+      }
+    }
+
+
+    /*
+      ── finishExercise() ──────────────────────────────────
+      Schließt die aktuelle Übung ab.
+
+      [...state.currentSets] → Spread-Operator: erstellt eine KOPIE des Arrays.
+      Warum Kopie? Weil wir danach state.currentSets leeren.
+      Ohne Kopie würde auch das gespeicherte Array geleert.
+    */
+    function finishExercise() {
+      if (state.currentSets.length === 0) return;
+
+      // Übung mit Sätzen in completedExercises speichern
+      state.completedExercises.push({
+        name: state.currentExercise,
+        sets: [...state.currentSets]  // KOPIE, nicht Referenz!
+      });
+
+      // State für nächste Übung zurücksetzen
+      state.currentExercise = null;
+      state.currentSets = [];
+
+      // Eingabebereich verstecken
+      document.getElementById('setInputSection').style.display = 'none';
+
+      // "Abschließen"-Button einblenden
+      document.getElementById('goSummaryBtn').style.display = 'block';
+
+      // Buttons aktualisieren (fertige Übung als ✓ markieren)
+      renderExerciseButtons();
+
+      // Erfolgsmeldung
+      const lastEx = state.completedExercises[state.completedExercises.length - 1];
+      showToast(`✓ ${lastEx.name} gespeichert`, 'success');
+    }
+
+
+    /*
+      ── changeExercise() ──────────────────────────────────
+      Abbr einer Übung ohne Speichern (Übung wechseln).
+      Setzt nur die UI zurück, completedExercises bleibt unverändert.
+    */
+    function changeExercise() {
+      state.currentExercise = null;
+      state.currentSets = [];
+      document.getElementById('setInputSection').style.display = 'none';
+      renderExerciseButtons();
+    }
+
+
+    /*
+      ── goToSummary() ─────────────────────────────────────
+      Wechselt zu Screen 3 (Zusammenfassung).
+      Baut vorher die Zusammenfassung auf.
+    */
+    function goToSummary() {
+      if (state.completedExercises.length === 0) {
+        showToast('Noch keine Übungen abgeschlossen', 'error');
+        return;
+      }
+      renderSummary();
+      showScreen('screen-summary');
+    }
+
+
+    /*
+      ── renderSummary() ───────────────────────────────────
+      Baut die Zusammenfassung auf Screen 3 auf.
+
+      join(' · ') → Array-Elemente mit " · " verbinden
+      ["Satz 1: 80kg × 8", "Satz 2: 85kg × 6"].join(' · ')
+      → "Satz 1: 80kg × 8 · Satz 2: 85kg × 6"
+    */
+    function renderSummary() {
+      const el = document.getElementById('summaryContent');
+
+      // Header mit Trainingsart
+      el.innerHTML = `
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <span style="font-size:0.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Trainingsart</span>
+          <span style="font-weight:700;color:var(--accent)">${state.type}</span>
+        </div>
+        <div style="height:1px;background:var(--border);margin-bottom:10px"></div>
+      `;
+
+      // Jede fertige Übung als Zeile
+      state.completedExercises.forEach(ex => {
+        const div = document.createElement('div');
+        div.className = 'summary-exercise';
+
+        const setsText = ex.sets
+          .map((s, i) => `Satz ${i + 1}: ${s.weight}kg × ${s.reps}`)
+          .join(' · ');
+
+        div.innerHTML = `
+          <div>
+            <div class="summary-ex-name">${ex.name}</div>
+            <div class="summary-ex-sets">${setsText}</div>
+          </div>
+          <div class="summary-count">${ex.sets.length}×</div>
+        `;
+        el.appendChild(div);
+      });
+    }
+
+
+    /*
+      ── saveTraining() ────────────────────────────────────
+      Sendet die Trainingsdaten an Google Apps Script.
+
+      WAS WIRD GESENDET?
+      Ein JSON-Objekt (payload) mit allen Trainings-Infos.
+
+      WIE?
+      Per HTTP POST via verstecktem HTML-Formular + iframe.
+      (Technischer Hintergrund: Google Apps Script hat CORS-Beschränkungen.
+      fetch() mit mode:'no-cors' kann keine Antwort lesen.
+      Lösung: Formular-Submit in iframe umgeht dieses Problem.)
+
+      JSON.stringify(payload) → JavaScript-Objekt → JSON-String
+      Beispiel-Payload:
+      {
+        "datum": "27.03.2026",
+        "uhrzeit": "18:30",
+        "trainingsart": "Brust",
+        "uebungen": [
+          {
+            "name": "Bench",
+            "saetze": [
+              { "satz": 1, "gewicht_kg": 80, "wiederholungen": 8 }
+            ]
+          }
+        ]
+      }
+    */
+    function saveTraining() {
+      const webhookUrl = document.getElementById('webhookUrl').value.trim();
+
+      if (!webhookUrl) {
+        showToast('Bitte Web-App-URL eingeben', 'error');
+        return;
+      }
+
+      // URL für nächstes Mal speichern
+      localStorage.setItem('webhookUrl', webhookUrl);
+
+      // Button in Ladezustand versetzen
+      const btn = document.getElementById('saveBtn');
+      btn.innerHTML = '<span class="spinner"></span>Wird gesendet...';
+      btn.disabled = true;
+
+      /*
+        Payload (Nutzdaten) aufbauen.
+        toLocaleDateString/toLocaleTimeString → lokales Datum/Uhrzeit
+        map() → Array transformieren: jedes Element umwandeln
+      */
+      const payload = {
+        datum:       new Date().toLocaleDateString('de-DE'),
+        uhrzeit:     new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+        trainingsart: state.type,
+        uebungen:    state.completedExercises.map(ex => ({
+          name:   ex.name,
+          saetze: ex.sets.map((s, i) => ({
+            satz:            i + 1,
+            gewicht_kg:      s.weight,
+            wiederholungen:  s.reps
+          }))
+        }))
+      };
+
+      /*
+        IFRAME-TRICK für Google Apps Script:
+        Problem: fetch() mit Apps Script → CORS-Fehler
+        Lösung: Unsichtbares <iframe> + <form> das dorthin submitted
+
+        1. iframe erstellen (einmalig) – "Zielfenster" für das Formular
+        2. Formular erstellen mit POST-Methode und Apps Script URL
+        3. JSON als Hidden Input anhängen
+        4. Formular ins DOM einhängen und absenden
+        5. Formular nach 1 Sekunde wieder entfernen (Aufräumen)
+      */
+      let iframe = document.getElementById('submitFrame');
+      if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.name = 'submitFrame';
+        iframe.id   = 'submitFrame';
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+      }
+
+      const form   = document.createElement('form');
+      form.method  = 'POST';
+      form.action  = webhookUrl;
+      form.target  = 'submitFrame';  // im iframe öffnen, nicht im Hauptfenster
+      form.style.display = 'none';
+
+      const input  = document.createElement('input');
+      input.type   = 'hidden';
+      input.name   = 'payload';
+      input.value  = JSON.stringify(payload);
+
+      form.appendChild(input);
+      document.body.appendChild(form);
+
+      /*
+        try/catch: Fehlerbehandlung
+        try   → versuche diesen Code
+        catch → wenn ein Fehler auftritt, führe das aus
+        finally → wird immer ausgeführt (Aufräumen)
+      */
+      try {
+        form.submit();
+        showToast('✓ Training gesendet – Sheet prüfen', 'success');
+        btn.innerHTML = '✓ Gesendet';
+        btn.style.background = '#2a3a00';
+        btn.style.color = 'var(--accent)';
+      } catch (e) {
+        console.error(e);  // Fehler in Browser-Konsole ausgeben
+        showToast('Senden fehlgeschlagen', 'error');
+        btn.innerHTML = 'Training speichern →';
+        btn.disabled  = false;
+      } finally {
+        setTimeout(() => form.remove(), 1000);  // Formular nach 1s entfernen
+      }
+    }
+
+
+    /*
+      ── resetAll() ────────────────────────────────────────
+      Setzt die komplette App zurück.
+      State auf Ausgangswerte, zurück zu Screen 1.
+    */
+    function resetAll() {
+      state = {
+        type: null,
+        currentExercise: null,
+        currentSets: [],
+        completedExercises: []
+      };
+      showScreen('screen-type');
+    }
+
+
+    /*
+      ── showToast(msg, type) ──────────────────────────────
+      Zeigt eine kurze Benachrichtigung unten am Bildschirm.
+
+      type = '' | 'success' | 'error'
+      setTimeout → führt Funktion nach X Millisekunden aus
+      2800ms = 2.8 Sekunden bis Toast wieder verschwindet
+    */
+    function showToast(msg, type = '') {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className   = 'toast show ' + type;
+      setTimeout(() => t.className = 'toast', 2800);
+    }
+
+
+    /*
+      ── EVENT LISTENER ────────────────────────────────────
+      addEventListener wartet auf ein Ereignis und führt eine Funktion aus.
+
+      'keydown' → wird ausgelöst wenn eine Taste gedrückt wird
+      e.key === 'Enter' → nur wenn Enter gedrückt wurde
+
+      Ablauf beim Eingeben eines Satzes:
+      1. Gewicht tippen → Enter → Fokus springt zu Wdh
+      2. Wdh tippen → Enter → Satz wird hinzugefügt
+      Das ermöglicht schnelle Eingabe ohne Maus/Tippen auf Buttons.
+    */
+    document.getElementById('inputReps').addEventListener('keydown', e => {
+      if (e.key === 'Enter') addSet();
+    });
+
+    document.getElementById('inputWeight').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('inputReps').focus();
+    });
+
+  </script>
+</body>
+</html>
