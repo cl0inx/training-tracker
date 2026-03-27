@@ -590,7 +590,7 @@ function renderSummary() {
   });
 }
 
-async function saveTraining() {
+function saveTraining() {
   const webhookUrl = document.getElementById('webhookUrl').value.trim();
   if (!webhookUrl) {
     showToast('Bitte Web-App-URL eingeben', 'error');
@@ -617,13 +617,33 @@ async function saveTraining() {
     }))
   };
 
+  // unsichtbares iframe anlegen, falls noch nicht vorhanden
+  let iframe = document.getElementById('submitFrame');
+  if (!iframe) {
+    iframe = document.createElement('iframe');
+    iframe.name = 'submitFrame';
+    iframe.id = 'submitFrame';
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+  }
+
+  // temporäres Formular bauen
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = webhookUrl;
+  form.target = 'submitFrame';
+  form.style.display = 'none';
+
+  const input = document.createElement('input');
+  input.type = 'hidden';
+  input.name = 'payload';
+  input.value = JSON.stringify(payload);
+  form.appendChild(input);
+
+  document.body.appendChild(form);
+
   try {
-    await fetch(webhookUrl, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    });
+    form.submit();
 
     showToast('✓ Training gesendet – Sheet prüfen', 'success');
     btn.innerHTML = '✓ Gesendet';
@@ -634,6 +654,8 @@ async function saveTraining() {
     showToast('Senden fehlgeschlagen', 'error');
     btn.innerHTML = 'Training speichern →';
     btn.disabled = false;
+  } finally {
+    setTimeout(() => form.remove(), 1000);
   }
 }
 
