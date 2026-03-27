@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Training Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0d;
+    --surface: #1a1a1a;
+    --surface2: #242424;
+    --border: #2e2e2e;
+    --accent: #e8ff47;
+    --accent2: #ff5c3a;
+    --text: #f0f0f0;
+    --muted: #888;
+    --radius: 14px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 0 80px;
+  }
+
+  header {
+    width: 100%;
+    padding: 28px 20px 12px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    letter-spacing: 2px;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .date-badge {
+    font-size: 0.75rem;
+    color: var(--muted);
+    background: var(--surface2);
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+  }
+
+  .screen { width: 100%; max-width: 480px; padding: 24px 20px; display: none; flex-direction: column; gap: 16px; }
+  .screen.active { display: flex; }
+
+  /* ---- STEP INDICATOR ---- */
+  .steps {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .step-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 0.3s;
+  }
+  .step-dot.done { background: var(--accent); }
+  .step-dot.active { background: var(--accent); width: 24px; border-radius: 4px; }
+
+  /* ---- SECTION LABEL ---- */
+  .section-label {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.7rem;
+    letter-spacing: 1px;
+    color: var(--text);
+    line-height: 1.1;
+  }
+  .section-label span { color: var(--accent); }
+
+  /* ---- CARDS / BUTTONS ---- */
+  .card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .card-grid.single { grid-template-columns: 1fr; }
+
+  .type-card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 16px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, transform 0.1s;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .type-card:active { transform: scale(0.97); }
+  .type-card.selected, .type-card:hover { border-color: var(--accent); background: #1e2200; }
+  .type-card .icon { font-size: 1.5rem; }
+  .type-card .name { font-weight: 600; font-size: 1rem; }
+  .type-card .sub { font-size: 0.75rem; color: var(--muted); }
+
+  .exercise-btn {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text);
+    text-align: left;
+    transition: border-color 0.2s, background 0.2s, transform 0.1s;
+    width: 100%;
+  }
+  .exercise-btn:active { transform: scale(0.98); }
+  .exercise-btn.selected, .exercise-btn:hover { border-color: var(--accent); background: #1e2200; color: var(--accent); }
+
+  /* ---- INPUT SECTION ---- */
+  .input-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .input-group label {
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 500;
+  }
+
+  .input-group input {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 600;
+    padding: 14px 14px;
+    width: 100%;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+  }
+  .input-group input:focus { border-color: var(--accent); }
+
+  /* ---- SETS LOG ---- */
+  .sets-log {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .sets-log-header {
+    display: grid;
+    grid-template-columns: 32px 1fr 1fr 32px;
+    padding: 8px 14px;
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 1px solid var(--border);
+  }
+  .set-row {
+    display: grid;
+    grid-template-columns: 32px 1fr 1fr 32px;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+    animation: slideIn 0.2s ease;
+  }
+  .set-row:last-child { border-bottom: none; }
+  .set-num { color: var(--accent); font-weight: 700; font-size: 0.85rem; }
+  .set-val { font-weight: 600; text-align: center; }
+  .del-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; padding: 2px; text-align: right; }
+  .del-btn:hover { color: var(--accent2); }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---- BUTTONS ---- */
+  .btn-primary {
+    background: var(--accent);
+    color: #0d0d0d;
+    border: none;
+    border-radius: var(--radius);
+    padding: 16px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.2rem;
+    letter-spacing: 1.5px;
+    cursor: pointer;
+    width: 100%;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+  .btn-primary:active { transform: scale(0.98); opacity: 0.9; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    width: 100%;
+    transition: border-color 0.2s, transform 0.1s;
+  }
+  .btn-secondary:active { transform: scale(0.98); }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-danger {
+    background: transparent;
+    color: var(--accent2);
+    border: 1.5px solid var(--accent2);
+    border-radius: var(--radius);
+    padding: 14px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .btn-danger:active { transform: scale(0.98); background: rgba(255,92,58,0.1); }
+
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  /* ---- TOAST ---- */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 30px;
+    padding: 12px 22px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    z-index: 99;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: var(--accent); color: var(--accent); }
+  .toast.error { border-color: var(--accent2); color: var(--accent2); }
+
+  /* ---- SUMMARY ---- */
+  .summary-block {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .summary-exercise {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .summary-exercise:last-child { border-bottom: none; }
+  .summary-ex-name { font-weight: 600; font-size: 0.9rem; }
+  .summary-ex-sets { font-size: 0.78rem; color: var(--muted); margin-top: 3px; }
+  .summary-count { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; color: var(--accent); }
+
+  .webhook-section {
+    background: var(--surface2);
+    border-radius: var(--radius);
+    border: 1px dashed var(--border);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .webhook-section label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .webhook-section input {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    padding: 12px;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .webhook-section input:focus { border-color: var(--accent); }
+  .webhook-hint { font-size: 0.72rem; color: var(--muted); }
+
+  .spinner {
+    display: inline-block;
+    width: 16px; height: 16px;
+    border: 2px solid #0d0d0d;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .current-exercise-badge {
+    background: #1e2200;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    color: var(--accent);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .current-exercise-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">LOGBOOK</div>
+  <div class="date-badge" id="dateBadge"></div>
+</header>
+
+<!-- SCREEN 1: Trainingsart -->
+<div class="screen active" id="screen-type">
+  <div class="steps">
+    <div class="step-dot active"></div>
+    <div class="step-dot"></div>
+    <div class="step-dot"></div>
+  </div>
+  <div class="section-label">Was trainierst<br><span>du heute?</span></div>
+  <div class="card-grid">
+    <div class="type-card" onclick="selectType('Beine')">
+      <div class="icon">🦵</div>
+      <div class="name">Beine</div>
+      <div class="sub">4 Übungen</div>
+    </div>
+    <div class="type-card" onclick="selectType('Brust')">
+      <div class="icon">💪</div>
+      <div class="name">Brust</div>
+      <div class="sub">4 Übungen</div>
+    </div>
+    <div class="type-card" onclick="selectType('Rücken')">
+      <div class="icon">🏋️</div>
+      <div class="name">Rücken</div>
+      <div class="sub">4 Übungen</div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN 2: Übung & Sätze -->
+<div class="screen" id="screen-exercise">
+  <div class="steps">
+    <div class="step-dot done"></div>
+    <div class="step-dot active"></div>
+    <div class="step-dot"></div>
+  </div>
+  <div class="section-label" id="exerciseScreenTitle">Übung wählen</div>
+
+  <div id="exerciseButtons"></div>
+
+  <div id="setInputSection" style="display:none; flex-direction:column; gap:14px;">
+    <div class="current-exercise-badge">
+      <div class="dot"></div>
+      <span id="currentExerciseName"></span>
+    </div>
+
+    <div class="input-row">
+      <div class="input-group">
+        <label>Gewicht (kg)</label>
+        <input type="number" id="inputWeight" placeholder="80" min="0" step="0.5" inputmode="decimal">
+      </div>
+      <div class="input-group">
+        <label>Wiederholungen</label>
+        <input type="number" id="inputReps" placeholder="10" min="1" inputmode="numeric">
+      </div>
+    </div>
+
+    <div id="setsLog" style="display:none;">
+      <div class="sets-log">
+        <div class="sets-log-header">
+          <span>#</span><span style="text-align:center">KG</span><span style="text-align:center">WDH</span><span></span>
+        </div>
+        <div id="setsLogRows"></div>
+      </div>
+    </div>
+
+    <button class="btn-primary" onclick="addSet()">+ Satz hinzufügen</button>
+
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="changeExercise()">Übung wechseln</button>
+      <button class="btn-secondary" id="finishExBtn" onclick="finishExercise()" disabled>Übung fertig ✓</button>
+    </div>
+  </div>
+
+  <div id="noExerciseYet" style="padding: 8px 0;">
+    <button class="btn-secondary" onclick="goToSummary()" id="goSummaryBtn" style="display:none">Training abschließen →</button>
+  </div>
+</div>
+
+<!-- SCREEN 3: Zusammenfassung & Speichern -->
+<div class="screen" id="screen-summary">
+  <div class="steps">
+    <div class="step-dot done"></div>
+    <div class="step-dot done"></div>
+    <div class="step-dot active"></div>
+  </div>
+  <div class="section-label">Training<br><span>Zusammenfassung</span></div>
+
+  <div class="summary-block" id="summaryContent"></div>
+
+  <div class="webhook-section">
+    <label>Google Apps Script Web-App-URL</label>
+    <input type="url" id="webhookUrl" placeholder="https://script.google.com/macros/s/..." value="">
+    <div class="webhook-hint">Die URL deiner Google Apps Script Web-App einfügen. Wird lokal gespeichert.</div>
+  </div>
+
+  <button class="btn-primary" id="saveBtn" onclick="saveTraining()">Training speichern →</button>
+  <button class="btn-danger" onclick="resetAll()">Neues Training starten</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const EXERCISES = {
+  'Beine': ['Squats', 'LH Schulterdrücken', 'RDL', 'Seitheben am Kabel'],
+  'Brust': ['Bench', 'Dips', 'Schrägbankdrücken', 'Überkopfzüge'],
+  'Rücken': ['Klimmzüge', 'LH Curls', 'Einarm Rudern', 'Kabelcurls']
+};
+
+let state = {
+  type: null,
+  currentExercise: null,
+  currentSets: [],
+  completedExercises: [],
+};
+
+// Init
+document.getElementById('dateBadge').textContent = new Date().toLocaleDateString('de-DE', {weekday:'short', day:'2-digit', month:'short'});
+const savedWebhook = localStorage.getItem('webhookUrl');
+if (savedWebhook) document.getElementById('webhookUrl').value = savedWebhook;
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function selectType(type) {
+  state.type = type;
+  state.currentExercise = null;
+  state.currentSets = [];
+  state.completedExercises = [];
+  document.getElementById('exerciseScreenTitle').innerHTML = `<span>${type}</span> –<br>Übung wählen`;
+  renderExerciseButtons();
+  document.getElementById('setInputSection').style.display = 'none';
+  document.getElementById('goSummaryBtn').style.display = 'none';
+  showScreen('screen-exercise');
+}
+
+function renderExerciseButtons() {
+  const container = document.getElementById('exerciseButtons');
+  const exercises = EXERCISES[state.type];
+  const doneNames = state.completedExercises.map(e => e.name);
+  container.innerHTML = '';
+  exercises.forEach(ex => {
+    const btn = document.createElement('button');
+    btn.className = 'exercise-btn' + (doneNames.includes(ex) ? ' selected' : '');
+    btn.style.marginBottom = '8px';
+    btn.innerHTML = doneNames.includes(ex)
+      ? `✓ ${ex} <span style="color:var(--muted);font-size:0.8rem">(${state.completedExercises.find(e=>e.name===ex).sets.length} Sätze)</span>`
+      : ex;
+    if (!doneNames.includes(ex)) btn.onclick = () => selectExercise(ex);
+    container.appendChild(btn);
+  });
+}
+
+function selectExercise(name) {
+  state.currentExercise = name;
+  state.currentSets = [];
+  document.getElementById('currentExerciseName').textContent = name;
+  document.getElementById('setInputSection').style.display = 'flex';
+  document.getElementById('setsLog').style.display = 'none';
+  document.getElementById('setsLogRows').innerHTML = '';
+  document.getElementById('inputWeight').value = '';
+  document.getElementById('inputReps').value = '';
+  document.getElementById('finishExBtn').disabled = true;
+  renderExerciseButtons();
+  // scroll to input
+  setTimeout(() => document.getElementById('setInputSection').scrollIntoView({behavior:'smooth', block:'start'}), 100);
+}
+
+function addSet() {
+  const weight = document.getElementById('inputWeight').value;
+  const reps = document.getElementById('inputReps').value;
+  if (!weight || !reps) { showToast('Gewicht und Wiederholungen eingeben', 'error'); return; }
+  state.currentSets.push({ weight: parseFloat(weight), reps: parseInt(reps) });
+  renderSetsLog();
+  document.getElementById('finishExBtn').disabled = false;
+  document.getElementById('inputReps').value = '';
+  document.getElementById('inputReps').focus();
+}
+
+function renderSetsLog() {
+  const rows = document.getElementById('setsLogRows');
+  rows.innerHTML = '';
+  state.currentSets.forEach((s, i) => {
+    const row = document.createElement('div');
+    row.className = 'set-row';
+    row.innerHTML = `<span class="set-num">${i+1}</span><span class="set-val">${s.weight} kg</span><span class="set-val">${s.reps} ×</span><button class="del-btn" onclick="deleteSet(${i})">✕</button>`;
+    rows.appendChild(row);
+  });
+  document.getElementById('setsLog').style.display = state.currentSets.length > 0 ? 'block' : 'none';
+}
+
+function deleteSet(i) {
+  state.currentSets.splice(i, 1);
+  renderSetsLog();
+  if (state.currentSets.length === 0) document.getElementById('finishExBtn').disabled = true;
+}
+
+function finishExercise() {
+  if (state.currentSets.length === 0) return;
+  state.completedExercises.push({ name: state.currentExercise, sets: [...state.currentSets] });
+  state.currentExercise = null;
+  state.currentSets = [];
+  document.getElementById('setInputSection').style.display = 'none';
+  document.getElementById('goSummaryBtn').style.display = 'block';
+  renderExerciseButtons();
+  showToast(`✓ ${state.completedExercises[state.completedExercises.length-1].name} gespeichert`, 'success');
+}
+
+function changeExercise() {
+  state.currentExercise = null;
+  state.currentSets = [];
+  document.getElementById('setInputSection').style.display = 'none';
+  renderExerciseButtons();
+}
+
+function goToSummary() {
+  if (state.completedExercises.length === 0) { showToast('Noch keine Übungen abgeschlossen', 'error'); return; }
+  renderSummary();
+  showScreen('screen-summary');
+}
+
+function renderSummary() {
+  const el = document.getElementById('summaryContent');
+  el.innerHTML = `<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:0.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Trainingsart</span><span style="font-weight:700;color:var(--accent)">${state.type}</span></div><div style="height:1px;background:var(--border);margin-bottom:10px"></div>`;
+  state.completedExercises.forEach(ex => {
+    const div = document.createElement('div');
+    div.className = 'summary-exercise';
+    const setsText = ex.sets.map((s,i) => `Satz ${i+1}: ${s.weight}kg × ${s.reps}`).join(' · ');
+    div.innerHTML = `<div><div class="summary-ex-name">${ex.name}</div><div class="summary-ex-sets">${setsText}</div></div><div class="summary-count">${ex.sets.length}×</div>`;
+    el.appendChild(div);
+  });
+}
+
+async function saveTraining() {
+  const webhookUrl = document.getElementById('webhookUrl').value.trim();
+  if (!webhookUrl) {
+    showToast('Bitte Web-App-URL eingeben', 'error');
+    return;
+  }
+
+  localStorage.setItem('webhookUrl', webhookUrl);
+
+  const btn = document.getElementById('saveBtn');
+  btn.innerHTML = '<span class="spinner"></span>Wird gesendet...';
+  btn.disabled = true;
+
+  const payload = {
+    datum: new Date().toLocaleDateString('de-DE'),
+    uhrzeit: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+    trainingsart: state.type,
+    uebungen: state.completedExercises.map(ex => ({
+      name: ex.name,
+      saetze: ex.sets.map((s, i) => ({
+        satz: i + 1,
+        gewicht_kg: s.weight,
+        wiederholungen: s.reps
+      }))
+    }))
+  };
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    });
+
+    const resultText = await response.text();
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${resultText}`);
+    }
+
+    showToast('✓ Training gespeichert!', 'success');
+    btn.innerHTML = '✓ Gespeichert';
+    btn.style.background = '#2a3a00';
+    btn.style.color = 'var(--accent)';
+
+    console.log('Server-Antwort:', resultText);
+  } catch (e) {
+    console.error(e);
+    showToast('Fehler beim Senden – URL oder Bereitstellung prüfen', 'error');
+    btn.innerHTML = 'Training speichern →';
+    btn.disabled = false;
+  }
+}
+
+function resetAll() {
+  state = { type: null, currentExercise: null, currentSets: [], completedExercises: [] };
+  showScreen('screen-type');
+}
+
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => t.className = 'toast', 2800);
+}
+
+// Enter-Taste für Satz hinzufügen
+document.getElementById('inputReps').addEventListener('keydown', e => { if (e.key === 'Enter') addSet(); });
+document.getElementById('inputWeight').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('inputReps').focus(); });
+</script>
+</body>
+</html>
