@@ -618,27 +618,20 @@ async function saveTraining() {
   };
 
   try {
-    const response = await fetch(webhookUrl, {
+    await fetch(webhookUrl, {
       method: 'POST',
+      mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(payload)
     });
 
-    const resultText = await response.text();
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${resultText}`);
-    }
-
-    showToast('✓ Training gespeichert!', 'success');
-    btn.innerHTML = '✓ Gespeichert';
+    showToast('✓ Training gesendet – Sheet prüfen', 'success');
+    btn.innerHTML = '✓ Gesendet';
     btn.style.background = '#2a3a00';
     btn.style.color = 'var(--accent)';
-
-    console.log('Server-Antwort:', resultText);
   } catch (e) {
     console.error(e);
-    showToast('Fehler beim Senden – URL oder Bereitstellung prüfen', 'error');
+    showToast('Senden fehlgeschlagen', 'error');
     btn.innerHTML = 'Training speichern →';
     btn.disabled = false;
   }
