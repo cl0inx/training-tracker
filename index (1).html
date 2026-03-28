@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Training Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0d;
+    --surface: #1a1a1a;
+    --surface2: #242424;
+    --border: #2e2e2e;
+    --accent: #e8ff47;
+    --accent2: #ff5c3a;
+    --text: #f0f0f0;
+    --muted: #888;
+    --radius: 14px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 0 80px;
+  }
+
+  header {
+    width: 100%;
+    padding: 28px 20px 12px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 2px; color: var(--accent); line-height: 1; }
+  .date-badge { font-size: 0.75rem; color: var(--muted); background: var(--surface2); padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border); }
+
+  .screen { width: 100%; max-width: 480px; padding: 24px 20px; display: none; flex-direction: column; gap: 16px; }
+  .screen.active { display: flex; }
+
+  .steps { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+  .step-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); transition: background 0.3s; }
+  .step-dot.done { background: var(--accent); }
+  .step-dot.active { background: var(--accent); width: 24px; border-radius: 4px; }
+
+  .section-label { font-family: 'Bebas Neue', sans-serif; font-size: 1.7rem; letter-spacing: 1px; color: var(--text); line-height: 1.1; }
+  .section-label span { color: var(--accent); }
+
+  .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .type-card {
+    background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius);
+    padding: 20px 16px; cursor: pointer; transition: border-color 0.2s, background 0.2s, transform 0.1s;
+    text-align: left; display: flex; flex-direction: column; gap: 6px;
+  }
+  .type-card:active { transform: scale(0.97); }
+  .type-card:hover { border-color: var(--accent); background: #1e2200; }
+  .type-card .icon { font-size: 1.5rem; }
+  .type-card .name { font-weight: 600; font-size: 1rem; }
+  .type-card .sub  { font-size: 0.75rem; color: var(--muted); }
+
+  .exercise-btn {
+    background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius);
+    padding: 16px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem;
+    font-weight: 500; color: var(--text); text-align: left;
+    transition: border-color 0.2s, background 0.2s, transform 0.1s; width: 100%;
+  }
+  .exercise-btn:active { transform: scale(0.98); }
+  .exercise-btn.selected, .exercise-btn:hover { border-color: var(--accent); background: #1e2200; color: var(--accent); }
+
+  /* Letztes Gewicht Hinweis unter dem Button */
+  .last-weight-hint {
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-top: 4px;
+    padding-left: 2px;
+  }
+  .last-weight-hint span { color: var(--accent); font-weight: 600; }
+
+  .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .input-group { display: flex; flex-direction: column; gap: 6px; }
+  .input-group label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 500; }
+  .input-group input {
+    background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px;
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 1.5rem; font-weight: 600;
+    padding: 14px; width: 100%; text-align: center; outline: none;
+    transition: border-color 0.2s; -webkit-appearance: none;
+  }
+  .input-group input:focus { border-color: var(--accent); }
+
+  .sets-log { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; }
+  .sets-log-header { display: grid; grid-template-columns: 32px 1fr 1fr 32px; padding: 8px 14px; font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); }
+  .set-row { display: grid; grid-template-columns: 32px 1fr 1fr 32px; padding: 10px 14px; font-size: 0.9rem; border-bottom: 1px solid var(--border); align-items: center; animation: slideIn 0.2s ease; }
+  .set-row:last-child { border-bottom: none; }
+  .set-num { color: var(--accent); font-weight: 700; font-size: 0.85rem; }
+  .set-val { font-weight: 600; text-align: center; }
+  .del-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; padding: 2px; text-align: right; }
+  .del-btn:hover { color: var(--accent2); }
+
+  /* Kleines Sync-Icon das zeigt ob ein Satz gerade gespeichert wird */
+  .set-sync { font-size: 0.7rem; color: var(--muted); text-align: right; }
+  .set-sync.saving { color: var(--accent); }
+  .set-sync.saved  { color: #4caf50; }
+  .set-sync.error  { color: var(--accent2); }
+
+  @keyframes slideIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+
+  .btn-primary {
+    background: var(--accent); color: #0d0d0d; border: none; border-radius: var(--radius);
+    padding: 16px; font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem;
+    letter-spacing: 1.5px; cursor: pointer; width: 100%; transition: opacity 0.2s, transform 0.1s;
+  }
+  .btn-primary:active { transform: scale(0.98); opacity: 0.9; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .btn-secondary {
+    background: transparent; color: var(--text); border: 1.5px solid var(--border);
+    border-radius: var(--radius); padding: 14px; font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem; font-weight: 500; cursor: pointer; width: 100%;
+    transition: border-color 0.2s, transform 0.1s;
+  }
+  .btn-secondary:active { transform: scale(0.98); }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-danger {
+    background: transparent; color: var(--accent2); border: 1.5px solid var(--accent2);
+    border-radius: var(--radius); padding: 14px; font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem; font-weight: 500; cursor: pointer; width: 100%;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .btn-danger:active { transform: scale(0.98); background: rgba(255,92,58,0.1); }
+
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 30px;
+    padding: 12px 22px; font-size: 0.85rem; font-weight: 500; color: var(--text);
+    white-space: nowrap; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); z-index: 99;
+  }
+  .toast.show    { transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: var(--accent);  color: var(--accent); }
+  .toast.error   { border-color: var(--accent2); color: var(--accent2); }
+
+  .summary-block { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .summary-exercise { display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .summary-exercise:last-child { border-bottom: none; }
+  .summary-ex-name { font-weight: 600; font-size: 0.9rem; }
+  .summary-ex-sets { font-size: 0.78rem; color: var(--muted); margin-top: 3px; }
+  .summary-count   { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; color: var(--accent); }
+
+  .current-exercise-badge { background: #1e2200; border: 1px solid var(--accent); border-radius: 8px; padding: 8px 14px; font-size: 0.85rem; color: var(--accent); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .current-exercise-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+
+  /* Status-Anzeige oben (Supabase verbunden / nicht verbunden) */
+  .connection-badge {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.72rem; color: var(--muted);
+    background: var(--surface2); padding: 4px 10px;
+    border-radius: 20px; border: 1px solid var(--border);
+  }
+  .connection-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+  .connection-badge.ok .connection-dot { background: #4caf50; }
+  .connection-badge.ok { color: #4caf50; border-color: #4caf5044; }
+  .connection-badge.err .connection-dot { background: var(--accent2); }
+  .connection-badge.err { color: var(--accent2); border-color: var(--accent244); }
+
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #0d0d0d; border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">LOGBOOK</div>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <!-- Verbindungsstatus zu Supabase -->
+    <div class="connection-badge" id="connBadge">
+      <div class="connection-dot"></div>
+      <span id="connText">Verbinde...</span>
+    </div>
+    <div class="date-badge" id="dateBadge"></div>
+  </div>
+</header>
+
+
+<!-- SCREEN 0: Nutzerauswahl -->
+<div class="screen active" id="screen-user">
+  <div class="steps">
+    <div class="step-dot active"></div>
+    <div class="step-dot"></div>
+    <div class="step-dot"></div>
+    <div class="step-dot"></div>
+  </div>
+  <div class="section-label">Wer<br><span>trainiert heute?</span></div>
+  <div class="card-grid">
+    <div class="type-card" onclick="selectUser('Colin')">
+      <div class="icon">🏋️</div>
+      <div class="name">Colin</div>
+      <div class="sub">Dein Training</div>
+    </div>
+    <div class="type-card" onclick="selectUser('Chantal')">
+      <div class="icon">🌟</div>
+      <div class="name">Chantal</div>
+      <div class="sub">Ihr Training</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- SCREEN 1: Trainingsart -->
+<div class="screen" id="screen-type">
+  <div class="steps">
+    <div class="step-dot done"></div>
+    <div class="step-dot active"></div>
+    <div class="step-dot"></div>
+    <div class="step-dot"></div>
+  </div>
+  <div class="section-label">Was trainierst<br><span>du heute?</span></div>
+  <div class="card-grid">
+    <div class="type-card" onclick="selectType('Beine')">
+      <div class="icon">🦵</div>
+      <div class="name">Beine</div>
+      <div class="sub">4 Übungen</div>
+    </div>
+    <div class="type-card" onclick="selectType('Brust')">
+      <div class="icon">💪</div>
+      <div class="name">Brust</div>
+      <div class="sub">4 Übungen</div>
+    </div>
+    <div class="type-card" onclick="selectType('Rücken')">
+      <div class="icon">🏋️</div>
+      <div class="name">Rücken</div>
+      <div class="sub">4 Übungen</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- SCREEN 2: Übung & Sätze -->
+<div class="screen" id="screen-exercise">
+  <div class="steps">
+    <div class="step-dot done"></div>
+    <div class="step-dot done"></div>
+    <div class="step-dot active"></div>
+    <div class="step-dot"></div>
+  </div>
+  <div class="section-label" id="exerciseScreenTitle">Übung wählen</div>
+
+  <div id="exerciseButtons"></div>
+
+  <div id="setInputSection" style="display:none; flex-direction:column; gap:14px;">
+    <div class="current-exercise-badge">
+      <div class="dot"></div>
+      <span id="currentExerciseName"></span>
+    </div>
+
+    <div class="input-row">
+      <div class="input-group">
+        <label>Gewicht (kg)</label>
+        <input type="number" id="inputWeight" placeholder="80" min="0" step="0.5" inputmode="decimal">
+      </div>
+      <div class="input-group">
+        <label>Wiederholungen</label>
+        <input type="number" id="inputReps" placeholder="10" min="1" inputmode="numeric">
+      </div>
+    </div>
+
+    <div id="setsLog" style="display:none;">
+      <div class="sets-log">
+        <div class="sets-log-header">
+          <span>#</span>
+          <span style="text-align:center">KG</span>
+          <span style="text-align:center">WDH</span>
+          <span></span>
+        </div>
+        <div id="setsLogRows"></div>
+      </div>
+    </div>
+
+    <button class="btn-primary" onclick="addSet()">+ Satz hinzufügen</button>
+
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="changeExercise()">Übung wechseln</button>
+      <button class="btn-secondary" id="finishExBtn" onclick="finishExercise()" disabled>Übung fertig ✓</button>
+    </div>
+  </div>
+
+  <div id="noExerciseYet" style="padding: 8px 0;">
+    <button class="btn-secondary" onclick="goToSummary()" id="goSummaryBtn" style="display:none">
+      Training abschließen →
+    </button>
+  </div>
+</div>
+
+
+<!-- SCREEN 3: Zusammenfassung -->
+<div class="screen" id="screen-summary">
+  <div class="steps">
+    <div class="step-dot done"></div>
+    <div class="step-dot done"></div>
+    <div class="step-dot done"></div>
+    <div class="step-dot active"></div>
+  </div>
+  <div class="section-label">Training<br><span>Zusammenfassung</span></div>
+
+  <div class="summary-block" id="summaryContent"></div>
+
+  <!-- Info dass alles bereits gespeichert ist -->
+  <div style="background:#1a2400;border:1px solid var(--accent);border-radius:var(--radius);padding:14px;font-size:0.85rem;color:var(--accent);display:flex;gap:10px;align-items:center;">
+    <span style="font-size:1.2rem">✓</span>
+    <span>Alle Sätze wurden bereits in Echtzeit gespeichert.</span>
+  </div>
+
+  <button class="btn-danger" onclick="resetAll()">Neues Training starten</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+
+<script>
+  // ═══════════════════════════════════════════════════════
+  // SUPABASE KONFIGURATION
+  // ═══════════════════════════════════════════════════════
+  //
+  // SUPABASE_URL  = deine Projektadresse
+  // SUPABASE_KEY  = dein anon/public Key
+  //
+  // Diese beiden Werte sagen der App WO und WIE sie mit
+  // der Datenbank kommunizieren soll.
+  //
+  // !! HIER DEINE EIGENEN WERTE EINTRAGEN !!
+  const SUPABASE_URL = 'https://bbkxvrhmppgakqmydyms.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJia3h2cmhtcHBnYWtxbXlkeW1zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3MTAwMDEsImV4cCI6MjA5MDI4NjAwMX0.CkHonwg2m9e60STtDi-HuMrKVL4BLzRVNkxiXvYbyGc';
+
+  // Die Tabelle in die wir schreiben (muss in Supabase existieren)
+  const TABLE = 'training';
+
+  // ═══════════════════════════════════════════════════════
+  // SUPABASE HILFSFUNKTIONEN
+  // ═══════════════════════════════════════════════════════
+  //
+  // Supabase hat eine REST API – das bedeutet:
+  // Jede Aktion (lesen, schreiben) ist eine HTTP-Anfrage an eine URL.
+  //
+  // HTTP-Methoden:
+  //   GET    → Daten lesen  (wie Browser der eine Seite aufruft)
+  //   POST   → Daten senden (wie Formular abschicken)
+  //   DELETE → Daten löschen
+  //   PATCH  → Daten ändern
+  //
+  // fetch() ist die JavaScript-Funktion für HTTP-Anfragen.
+  // Sie gibt ein "Promise" zurück – ein Versprechen dass die Antwort
+  // irgendwann kommt. Mit "await" warten wir darauf.
+
+  // Standardheader die jede Anfrage braucht:
+  // - apikey: beweist wer wir sind
+  // - Authorization: gleicher Key nochmal (Supabase-Konvention)
+  // - Content-Type: sagt dem Server "ich schicke JSON"
+  // - Prefer: return=minimal → Server soll nicht die ganze Zeile zurückschicken
+  const headers = {
+    'apikey':        SUPABASE_KEY,
+    'Authorization': `Bearer ${SUPABASE_KEY}`,
+    'Content-Type':  'application/json',
+    'Prefer':        'return=minimal'
+  };
+
+  // ── Einen Satz in Supabase speichern ──────────────────
+  // "async" = diese Funktion ist asynchron (wartet auf Antworten)
+  async function saveSatz(satzData) {
+    // fetch() sendet HTTP POST an Supabase
+    // URL-Aufbau: SUPABASE_URL + /rest/v1/ + Tabellenname
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}`, {
+      method:  'POST',
+      headers: headers,
+      body:    JSON.stringify(satzData)  // Objekt → JSON-String
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  }
+
+  // ── Letztes Gewicht pro Übung laden ───────────────────
+  // Supabase REST API unterstützt Filter direkt in der URL:
+  // ?select=spalten&filter=wert&order=spalte.desc&limit=1
+  async function loadLastWeight(uebungName) {
+    const url = `${SUPABASE_URL}/rest/v1/${TABLE}`
+      + `?select=gewicht_kg,wiederholungen`
+      + `&uebung=eq.${encodeURIComponent(uebungName)}`
+      + `&nutzer=eq.${encodeURIComponent(state.nutzer)}`
+      + `&order=created_at.desc`
+      + `&limit=1`;
+
+    const res = await fetch(url, {
+      method:  'GET',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+
+    if (!res.ok) return null;
+
+    // res.json() wandelt die JSON-Antwort in ein JavaScript-Objekt um
+    const data = await res.json();
+
+    // data ist ein Array – data[0] ist das erste (und einzige) Element
+    return data[0] || null;
+  }
+
+  // ── Verbindung testen ─────────────────────────────────
+  async function testConnection() {
+    try {
+      // Einfach eine Zeile abrufen – wenn es klappt, ist die Verbindung ok
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/${TABLE}?limit=1`,
+        { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+      );
+      if (res.ok) {
+        setConnectionStatus('ok');
+      } else {
+        setConnectionStatus('err');
+      }
+    } catch {
+      setConnectionStatus('err');
+    }
+  }
+
+  function setConnectionStatus(status) {
+    const badge = document.getElementById('connBadge');
+    const text  = document.getElementById('connText');
+    badge.className = 'connection-badge ' + status;
+    text.textContent = status === 'ok' ? 'Supabase ✓' : 'Keine Verbindung';
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // APP DATEN & STATE
+  // ═══════════════════════════════════════════════════════
+
+  const EXERCISES = {
+    'Beine':  ['Squats', 'LH Schulterdrücken', 'RDL', 'Seitheben am Kabel'],
+    'Brust':  ['Bench', 'Dips', 'Schrägbankdrücken', 'Überkopfzüge'],
+    'Rücken': ['Klimmzüge', 'LH Curls', 'Einarm Rudern', 'Kabelcurls']
+  };
+
+  // lastWeights speichert die letzten Gewichte aller Übungen
+  // { 'Bench': { gewicht_kg: 80, wiederholungen: 8 }, ... }
+  let lastWeights = {};
+
+  let state = {
+    nutzer: null,          // NEU: gewählter Nutzer ('Colin' oder 'Chantal')
+    type: null,
+    currentExercise: null,
+    currentSets: [],
+    completedExercises: []
+  };
+
+  // Heutiges Datum als ISO-String (2026-03-27) für die Datenbank
+  // und als lesbaren String für die Anzeige
+  const today        = new Date();
+  const todayISO     = today.toISOString().split('T')[0]; // "2026-03-27"
+  const todayDisplay = today.toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'short' });
+
+  // ═══════════════════════════════════════════════════════
+  // INITIALISIERUNG
+  // ═══════════════════════════════════════════════════════
+
+  document.getElementById('dateBadge').textContent = todayDisplay;
+
+  // Verbindung testen beim Laden der Seite
+  testConnection();
+
+  // Letzte Gewichte für alle Übungen vorladen
+  // (damit sie sofort da sind wenn der Nutzer eine Übung wählt)
+  async function preloadLastWeights() {
+    // Alle Übungen aus allen Trainingsarten in einem flachen Array sammeln
+    // Object.values() gibt alle Werte eines Objekts zurück
+    // flat() macht aus [[a,b],[c,d]] → [a,b,c,d]
+    const alleUebungen = Object.values(EXERCISES).flat();
+
+    // Für jede Übung parallel das letzte Gewicht laden
+    // Promise.all() wartet bis ALLE Anfragen fertig sind
+    await Promise.all(alleUebungen.map(async (uebung) => {
+      const last = await loadLastWeight(uebung);
+      if (last) lastWeights[uebung] = last;
+    }));
+  }
+
+  // Letzte Gewichte werden erst nach Nutzerauswahl geladen (in selectUser)
+  // preloadLastWeights(); ← nicht beim Start, erst nach Nutzerauswahl
+
+  // ═══════════════════════════════════════════════════════
+  // SCREEN-NAVIGATION
+  // ═══════════════════════════════════════════════════════
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // NUTZER WÄHLEN
+  // ═══════════════════════════════════════════════════════
+  // Wird aufgerufen wenn Colin oder Chantal angetippt wird.
+  // Lädt danach die letzten Gewichte für diesen Nutzer
+  // damit die Vorausfüllung nutzerspezifisch ist.
+
+  async function selectUser(name) {
+    state.nutzer = name;
+
+    // Header aktualisieren: Name anzeigen
+    document.getElementById('connText').textContent = name + ' · Supabase ✓';
+
+    // Letzte Gewichte für diesen Nutzer neu laden
+    lastWeights = {};
+    await preloadLastWeights();
+
+    showScreen('screen-type');
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // TRAININGSART WÄHLEN
+  // ═══════════════════════════════════════════════════════
+
+  function selectType(type) {
+    state.type = type;
+    state.currentExercise = null;
+    state.currentSets = [];
+    state.completedExercises = [];
+
+    document.getElementById('exerciseScreenTitle').innerHTML =
+      `<span>${type}</span> –<br>Übung wählen`;
+
+    renderExerciseButtons();
+    document.getElementById('setInputSection').style.display = 'none';
+    document.getElementById('goSummaryBtn').style.display = 'none';
+    showScreen('screen-exercise');
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // ÜBUNGS-BUTTONS RENDERN
+  // ═══════════════════════════════════════════════════════
+  //
+  // NEU: Unter jedem Button wird das letzte Gewicht angezeigt
+  // falls vorhanden ("Zuletzt: 80 kg × 8")
+
+  function renderExerciseButtons() {
+    const container  = document.getElementById('exerciseButtons');
+    const exercises  = EXERCISES[state.type];
+    const doneNames  = state.completedExercises.map(e => e.name);
+    container.innerHTML = '';
+
+    exercises.forEach(ex => {
+      // Wrapper div für Button + Hinweis
+      const wrapper = document.createElement('div');
+      wrapper.style.marginBottom = '8px';
+
+      const btn = document.createElement('button');
+      btn.className = 'exercise-btn' + (doneNames.includes(ex) ? ' selected' : '');
+
+      btn.innerHTML = doneNames.includes(ex)
+        ? `✓ ${ex} <span style="color:var(--muted);font-size:0.8rem">(${state.completedExercises.find(e=>e.name===ex).sets.length} Sätze)</span>`
+        : ex;
+
+      if (!doneNames.includes(ex)) btn.onclick = () => selectExercise(ex);
+
+      wrapper.appendChild(btn);
+
+      // Letztes Gewicht anzeigen (falls vorhanden und Übung noch nicht fertig)
+      if (!doneNames.includes(ex) && lastWeights[ex]) {
+        const hint = document.createElement('div');
+        hint.className = 'last-weight-hint';
+        hint.innerHTML = `Zuletzt: <span>${lastWeights[ex].gewicht_kg} kg × ${lastWeights[ex].wiederholungen}</span>`;
+        wrapper.appendChild(hint);
+      }
+
+      container.appendChild(wrapper);
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // ÜBUNG WÄHLEN
+  // ═══════════════════════════════════════════════════════
+  //
+  // NEU: Letztes Gewicht wird automatisch ins Eingabefeld eingetragen
+
+  function selectExercise(name) {
+    state.currentExercise = name;
+    state.currentSets = [];
+
+    document.getElementById('currentExerciseName').textContent = name;
+    document.getElementById('setInputSection').style.display = 'flex';
+    document.getElementById('setsLog').style.display = 'none';
+    document.getElementById('setsLogRows').innerHTML = '';
+    document.getElementById('finishExBtn').disabled = true;
+
+    // Letztes Gewicht vorausfüllen
+    if (lastWeights[name]) {
+      document.getElementById('inputWeight').value = lastWeights[name].gewicht_kg;
+      document.getElementById('inputReps').value   = lastWeights[name].wiederholungen;
+    } else {
+      document.getElementById('inputWeight').value = '';
+      document.getElementById('inputReps').value   = '';
+    }
+
+    renderExerciseButtons();
+
+    setTimeout(() => {
+      document.getElementById('setInputSection').scrollIntoView({ behavior:'smooth', block:'start' });
+    }, 100);
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // SATZ HINZUFÜGEN
+  // ═══════════════════════════════════════════════════════
+  //
+  // NEU: Jeder Satz wird SOFORT an Supabase gesendet.
+  // Der Nutzer sieht in der Satz-Liste einen kleinen Status:
+  // ⏳ Speichern... → ✓ (gespeichert) oder ✕ (Fehler)
+
+  async function addSet() {
+    const weight = document.getElementById('inputWeight').value;
+    const reps   = document.getElementById('inputReps').value;
+
+    if (!weight || !reps) {
+      showToast('Gewicht und Wiederholungen eingeben', 'error');
+      return;
+    }
+
+    const satzNummer = state.currentSets.length + 1;
+
+    // Satz zum lokalen state hinzufügen
+    const satz = {
+      weight:  parseFloat(weight),
+      reps:    parseInt(reps),
+      status:  'saving',  // Status für UI: saving | saved | error
+      dbId:    null       // ID die Supabase zurückgibt (für späteres Löschen)
+    };
+    state.currentSets.push(satz);
+
+    renderSetsLog();
+    document.getElementById('finishExBtn').disabled = false;
+
+    // Wiederholungsfeld leeren, Fokus setzen
+    document.getElementById('inputReps').value = '';
+    document.getElementById('inputReps').focus();
+
+    // Daten-Objekt für Supabase zusammenbauen
+    // Spaltennamen müssen EXAKT mit der Tabelle übereinstimmen
+    const satzData = {
+      datum:          todayISO,
+      uhrzeit:        new Date().toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' }),
+      trainingsart:   state.type,
+      uebung:         state.currentExercise,
+      satz:           satzNummer,
+      gewicht_kg:     parseFloat(weight),
+      wiederholungen: parseInt(reps),
+      nutzer:         state.nutzer
+    };
+
+    // Satz an Supabase senden (im Hintergrund)
+    try {
+      await saveSatz(satzData);
+      satz.status = 'saved';
+
+      // lastWeights aktualisieren damit nächste Übung aktuell ist
+      lastWeights[state.currentExercise] = {
+        gewicht_kg:     parseFloat(weight),
+        wiederholungen: parseInt(reps)
+      };
+
+    } catch (err) {
+      console.error('Speichern fehlgeschlagen:', err);
+      satz.status = 'error';
+      showToast('⚠ Satz nicht gespeichert – Verbindung prüfen', 'error');
+    }
+
+    // Liste neu rendern um Status-Icon zu aktualisieren
+    renderSetsLog();
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // SATZ-LISTE RENDERN
+  // ═══════════════════════════════════════════════════════
+  //
+  // NEU: Kleines Status-Icon pro Satz (⏳ / ✓ / ✕)
+
+  function renderSetsLog() {
+    const rows = document.getElementById('setsLogRows');
+    rows.innerHTML = '';
+
+    state.currentSets.forEach((s, i) => {
+      const row = document.createElement('div');
+      row.className = 'set-row';
+
+      // Status-Icon je nach Speicherstatus
+      const statusIcon = s.status === 'saving' ? '⏳'
+                       : s.status === 'saved'  ? '✓'
+                       : '✕';
+      const statusClass = s.status === 'saving' ? 'saving'
+                        : s.status === 'saved'  ? 'saved'
+                        : 'error';
+
+      row.innerHTML = `
+        <span class="set-num">${i + 1}</span>
+        <span class="set-val">${s.weight} kg</span>
+        <span class="set-val">${s.reps} ×</span>
+        <span class="set-sync ${statusClass}">${statusIcon}</span>
+      `;
+      rows.appendChild(row);
+    });
+
+    document.getElementById('setsLog').style.display =
+      state.currentSets.length > 0 ? 'block' : 'none';
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // ÜBUNG ABSCHLIESSEN
+  // ═══════════════════════════════════════════════════════
+
+  function finishExercise() {
+    if (state.currentSets.length === 0) return;
+
+    state.completedExercises.push({
+      name: state.currentExercise,
+      sets: [...state.currentSets]
+    });
+
+    state.currentExercise = null;
+    state.currentSets = [];
+
+    document.getElementById('setInputSection').style.display = 'none';
+    document.getElementById('goSummaryBtn').style.display = 'block';
+
+    renderExerciseButtons();
+
+    const lastEx = state.completedExercises[state.completedExercises.length - 1];
+    showToast(`✓ ${lastEx.name} abgeschlossen`, 'success');
+  }
+
+  function changeExercise() {
+    state.currentExercise = null;
+    state.currentSets = [];
+    document.getElementById('setInputSection').style.display = 'none';
+    renderExerciseButtons();
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // ZUSAMMENFASSUNG
+  // ═══════════════════════════════════════════════════════
+
+  function goToSummary() {
+    if (state.completedExercises.length === 0) {
+      showToast('Noch keine Übungen abgeschlossen', 'error');
+      return;
+    }
+    renderSummary();
+    showScreen('screen-summary');
+  }
+
+  function renderSummary() {
+    const el = document.getElementById('summaryContent');
+    el.innerHTML = `
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:0.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Trainingsart</span>
+        <span style="font-weight:700;color:var(--accent)">${state.type}</span>
+      </div>
+      <div style="height:1px;background:var(--border);margin-bottom:10px"></div>
+    `;
+
+    state.completedExercises.forEach(ex => {
+      const div = document.createElement('div');
+      div.className = 'summary-exercise';
+      const setsText = ex.sets.map((s, i) =>
+        `Satz ${i+1}: ${s.weight}kg × ${s.reps}`
+      ).join(' · ');
+      div.innerHTML = `
+        <div>
+          <div class="summary-ex-name">${ex.name}</div>
+          <div class="summary-ex-sets">${setsText}</div>
+        </div>
+        <div class="summary-count">${ex.sets.length}×</div>
+      `;
+      el.appendChild(div);
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // RESET
+  // ═══════════════════════════════════════════════════════
+
+  function resetAll() {
+    state = { nutzer: null, type: null, currentExercise: null, currentSets: [], completedExercises: [] };
+    lastWeights = {};
+    showScreen('screen-user');
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // TOAST (Benachrichtigung)
+  // ═══════════════════════════════════════════════════════
+
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className   = 'toast show ' + type;
+    setTimeout(() => t.className = 'toast', 2800);
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // TASTATUR-SHORTCUTS
+  // ═══════════════════════════════════════════════════════
+
+  document.getElementById('inputReps').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addSet();
+  });
+  document.getElementById('inputWeight').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('inputReps').focus();
+  });
+
+</script>
+</body>
+</html>
