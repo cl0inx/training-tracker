@@ -198,6 +198,45 @@
 
   .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #0d0d0d; border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Zurück-Button */
+  .btn-back {
+    background: none; border: none; color: var(--muted);
+    font-family: 'DM Sans', sans-serif; font-size: 0.85rem;
+    cursor: pointer; padding: 0; display: flex; align-items: center; gap: 6px;
+    transition: color 0.2s;
+  }
+  .btn-back:hover { color: var(--text); }
+
+  /* Übung hinzufügen Formular */
+  .add-exercise-form {
+    background: var(--surface2);
+    border: 1.5px dashed var(--accent);
+    border-radius: var(--radius);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    animation: slideIn 0.2s ease;
+  }
+  .add-exercise-form input {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    font-weight: 500;
+    padding: 12px 14px;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .add-exercise-form input:focus { border-color: var(--accent); }
+  .add-exercise-form label {
+    font-size: 0.72rem; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 1px;
+  }
 </style>
 </head>
 <body>
@@ -247,6 +286,7 @@
     <div class="step-dot"></div>
     <div class="step-dot"></div>
   </div>
+  <button class="btn-back" onclick="showScreen('screen-user')">← Nutzerwechsel</button>
   <div class="section-label">Was trainierst<br><span>du heute?</span></div>
   <div class="card-grid">
     <div class="type-card" onclick="selectType('Beine')">
@@ -278,7 +318,19 @@
   </div>
   <div class="section-label" id="exerciseScreenTitle">Übung wählen</div>
 
+  <button class="btn-back" onclick="backToType()">← Trainingsart wechseln</button>
+
   <div id="exerciseButtons"></div>
+
+  <!-- Übung hinzufügen Formular (startet versteckt) -->
+  <div id="addExerciseForm" class="add-exercise-form" style="display:none;">
+    <label>Neue Übung</label>
+    <input type="text" id="newExerciseName" placeholder="z.B. Bulgarian Split Squats">
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="hideAddForm()">Abbrechen</button>
+      <button class="btn-primary" onclick="saveNewExercise()">Speichern →</button>
+    </div>
+  </div>
 
   <div id="setInputSection" style="display:none; flex-direction:column; gap:14px;">
     <div class="current-exercise-badge">
@@ -531,11 +583,12 @@
   let lastWeights = {};
 
   let state = {
-    nutzer: null,          // NEU: gewählter Nutzer ('Colin' oder 'Chantal')
+    nutzer: null,
     type: null,
     currentExercise: null,
     currentSets: [],
-    completedExercises: []
+    completedExercises: [],
+    customExercises: []    // Eigene Übungen aus Supabase
   };
 
   // Heutiges Datum als ISO-String (2026-03-27) für die Datenbank
@@ -606,7 +659,7 @@
   // TRAININGSART WÄHLEN
   // ═══════════════════════════════════════════════════════
 
-  function selectType(type) {
+  async function selectType(type) {
     state.type = type;
     state.currentExercise = null;
     state.currentSets = [];
@@ -615,10 +668,24 @@
     document.getElementById('exerciseScreenTitle').innerHTML =
       `<span>${type}</span> –<br>Übung wählen`;
 
+    // Eigene Übungen für diese Trainingsart laden
+    await loadCustomExercises();
+
     renderExerciseButtons();
     document.getElementById('setInputSection').style.display = 'none';
     document.getElementById('goSummaryBtn').style.display = 'none';
+    document.getElementById('addExerciseForm').style.display = 'none';
     showScreen('screen-exercise');
+  }
+
+  // Zurück zur Trainingsartauswahl (ohne completedExercises zu löschen
+  // falls jemand Ganzkörper macht und Trainingsart wechseln will)
+  function backToType() {
+    state.currentExercise = null;
+    state.currentSets = [];
+    document.getElementById('setInputSection').style.display = 'none';
+    document.getElementById('addExerciseForm').style.display = 'none';
+    showScreen('screen-type');
   }
 
   // ═══════════════════════════════════════════════════════
@@ -630,12 +697,12 @@
 
   function renderExerciseButtons() {
     const container  = document.getElementById('exerciseButtons');
-    const exercises  = EXERCISES[state.type];
+    // Standard-Übungen + eigene Übungen zusammenführen
+    const exercises  = [...(EXERCISES[state.type] || []), ...state.customExercises];
     const doneNames  = state.completedExercises.map(e => e.name);
     container.innerHTML = '';
 
     exercises.forEach(ex => {
-      // Wrapper div für Button + Hinweis
       const wrapper = document.createElement('div');
       wrapper.style.marginBottom = '8px';
 
@@ -647,20 +714,98 @@
         : ex;
 
       if (!doneNames.includes(ex)) btn.onclick = () => selectExercise(ex);
-
       wrapper.appendChild(btn);
-
-      // Letzte Session erscheint nach Übungsauswahl als Box
-
       container.appendChild(wrapper);
     });
+
+    // "+ Übung hinzufügen" Button immer am Ende
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn-secondary';
+    addBtn.style.marginTop = '4px';
+    addBtn.style.borderStyle = 'dashed';
+    addBtn.textContent = '+ Übung hinzufügen';
+    addBtn.onclick = showAddForm;
+    container.appendChild(addBtn);
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // EIGENE ÜBUNGEN
+  // ═══════════════════════════════════════════════════════
+
+  // Eigene Übungen aus Supabase laden (gefiltert nach Nutzer + Trainingsart)
+  async function loadCustomExercises() {
+    const url = `${SUPABASE_URL}/rest/v1/uebungen`
+      + `?select=name`
+      + `&nutzer=eq.${encodeURIComponent(state.nutzer)}`
+      + `&trainingsart=eq.${encodeURIComponent(state.type)}`
+      + `&order=created_at.asc`;
+
+    try {
+      const res = await fetch(url, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      // Nur die Namen extrahieren → ['Bulgarian SS', 'Hackenschmidt']
+      state.customExercises = data.map(d => d.name);
+    } catch {
+      state.customExercises = [];
+    }
+  }
+
+  // Formular einblenden
+  function showAddForm() {
+    document.getElementById('addExerciseForm').style.display = 'flex';
+    document.getElementById('newExerciseName').value = '';
+    document.getElementById('newExerciseName').focus();
+    // Zum Formular scrollen
+    setTimeout(() => {
+      document.getElementById('addExerciseForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  }
+
+  // Formular ausblenden
+  function hideAddForm() {
+    document.getElementById('addExerciseForm').style.display = 'none';
+    document.getElementById('newExerciseName').value = '';
+  }
+
+  // Neue Übung in Supabase speichern
+  async function saveNewExercise() {
+    const name = document.getElementById('newExerciseName').value.trim();
+    if (!name) { showToast('Bitte einen Namen eingeben', 'error'); return; }
+
+    // Doppelte verhindern
+    const alle = [...(EXERCISES[state.type] || []), ...state.customExercises];
+    if (alle.includes(name)) { showToast('Übung existiert bereits', 'error'); return; }
+
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/uebungen`, {
+        method:  'POST',
+        headers: headers,
+        body:    JSON.stringify({
+          name:         name,
+          trainingsart: state.type,
+          nutzer:       state.nutzer
+        })
+      });
+
+      if (!res.ok) throw new Error();
+
+      // Lokal hinzufügen und Buttons neu rendern
+      state.customExercises.push(name);
+      hideAddForm();
+      renderExerciseButtons();
+      showToast(`✓ "${name}" hinzugefügt`, 'success');
+
+    } catch {
+      showToast('Fehler beim Speichern', 'error');
+    }
   }
 
   // ═══════════════════════════════════════════════════════
   // ÜBUNG WÄHLEN
   // ═══════════════════════════════════════════════════════
-  //
-  // NEU: Letztes Gewicht wird automatisch ins Eingabefeld eingetragen
 
   async function selectExercise(name) {
     state.currentExercise = name;
@@ -869,7 +1014,7 @@
   // ═══════════════════════════════════════════════════════
 
   function resetAll() {
-    state = { nutzer: null, type: null, currentExercise: null, currentSets: [], completedExercises: [] };
+    state = { nutzer: null, type: null, currentExercise: null, currentSets: [], completedExercises: [], customExercises: [] };
     lastWeights = {};
     showScreen('screen-user');
   }
