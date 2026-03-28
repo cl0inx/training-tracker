@@ -76,14 +76,36 @@
   .exercise-btn:active { transform: scale(0.98); }
   .exercise-btn.selected, .exercise-btn:hover { border-color: var(--accent); background: #1e2200; color: var(--accent); }
 
-  /* Letztes Gewicht Hinweis unter dem Button */
-  .last-weight-hint {
-    font-size: 0.72rem;
-    color: var(--muted);
-    margin-top: 4px;
-    padding-left: 2px;
+  /* Letzte Session Box */
+  .last-session {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    animation: slideIn 0.2s ease;
   }
-  .last-weight-hint span { color: var(--accent); font-weight: 600; }
+  .last-session-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+  }
+  .last-session-header .ex-date { color: var(--accent); font-weight: 600; }
+  .last-session-row {
+    display: grid;
+    grid-template-columns: 40px 1fr 1fr;
+    padding: 7px 14px;
+    font-size: 0.85rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .last-session-row:last-child { border-bottom: none; }
+  .last-session-num { color: var(--muted); font-size: 0.78rem; }
+  .last-session-val { font-weight: 600; text-align: center; color: var(--text); }
 
   .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .input-group { display: flex; flex-direction: column; gap: 6px; }
@@ -264,6 +286,9 @@
       <span id="currentExerciseName"></span>
     </div>
 
+    <!-- Letzte Session wird hier per JS eingefügt -->
+    <div id="lastSessionBox"></div>
+
     <div class="input-row">
       <div class="input-group">
         <label>Gewicht (kg)</label>
@@ -390,26 +415,80 @@
   // ── Letztes Gewicht pro Übung laden ───────────────────
   // Supabase REST API unterstützt Filter direkt in der URL:
   // ?select=spalten&filter=wert&order=spalte.desc&limit=1
-  async function loadLastWeight(uebungName) {
-    const url = `${SUPABASE_URL}/rest/v1/${TABLE}`
-      + `?select=gewicht_kg,wiederholungen`
+  // Lädt alle Sätze der letzten Session für eine Übung
+  // Schritt 1: neuestes Datum für diese Übung + Nutzer finden
+  // Schritt 2: alle Sätze dieses Datums laden
+  async function loadLastSession(uebungName) {
+    // Schritt 1: letztes Datum finden
+    const urlDatum = `${SUPABASE_URL}/rest/v1/${TABLE}`
+      + `?select=datum`
       + `&uebung=eq.${encodeURIComponent(uebungName)}`
       + `&nutzer=eq.${encodeURIComponent(state.nutzer)}`
-      + `&order=created_at.desc`
+      + `&order=datum.desc`
       + `&limit=1`;
 
-    const res = await fetch(url, {
-      method:  'GET',
+    const resDatum = await fetch(urlDatum, {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
     });
+    if (!resDatum.ok) return null;
+    const datumData = await resDatum.json();
+    if (!datumData[0]) return null;
 
-    if (!res.ok) return null;
+    const letztesDatum = datumData[0].datum;
 
-    // res.json() wandelt die JSON-Antwort in ein JavaScript-Objekt um
-    const data = await res.json();
+    // Schritt 2: alle Sätze dieses Datums laden, sortiert nach Satznummer
+    const urlSaetze = `${SUPABASE_URL}/rest/v1/${TABLE}`
+      + `?select=satz,gewicht_kg,wiederholungen`
+      + `&uebung=eq.${encodeURIComponent(uebungName)}`
+      + `&nutzer=eq.${encodeURIComponent(state.nutzer)}`
+      + `&datum=eq.${letztesDatum}`
+      + `&order=satz.asc`;
 
-    // data ist ein Array – data[0] ist das erste (und einzige) Element
-    return data[0] || null;
+    const resSaetze = await fetch(urlSaetze, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    if (!resSaetze.ok) return null;
+    const saetze = await resSaetze.json();
+
+    return { datum: letztesDatum, saetze };
+  }
+
+  // Zeigt die letzte Session als Box an
+  function renderLastSession(sessionData) {
+    const box = document.getElementById('lastSessionBox');
+    if (!sessionData || !sessionData.saetze.length) {
+      box.innerHTML = '';
+      return;
+    }
+
+    // Datum formatieren: 2026-03-28 → 28.03.2026
+    const [j, m, t] = sessionData.datum.split('-');
+    const datumDE = `${t}.${m}.${j}`;
+
+    // Zeilen für jeden Satz bauen
+    const zeilen = sessionData.saetze.map(s => `
+      <div class="last-session-row">
+        <span class="last-session-num">Satz ${s.satz}</span>
+        <span class="last-session-val">${s.gewicht_kg} kg</span>
+        <span class="last-session-val">${s.wiederholungen} ×</span>
+      </div>
+    `).join('');
+
+    box.innerHTML = `
+      <div class="last-session">
+        <div class="last-session-header">
+          <span>Letztes Training</span>
+          <span class="ex-date">${datumDE}</span>
+        </div>
+        ${zeilen}
+      </div>
+    `;
+  }
+
+  // Kompatibilitätsfunktion – wird von preloadLastWeights gebraucht
+  // Wir laden jetzt keine Gewichte vor, sondern erst bei Übungsauswahl
+  async function loadLastWeight(uebungName) {
+    return null;
   }
 
   // ── Verbindung testen ─────────────────────────────────
@@ -571,13 +650,7 @@
 
       wrapper.appendChild(btn);
 
-      // Letztes Gewicht anzeigen (falls vorhanden und Übung noch nicht fertig)
-      if (!doneNames.includes(ex) && lastWeights[ex]) {
-        const hint = document.createElement('div');
-        hint.className = 'last-weight-hint';
-        hint.innerHTML = `Zuletzt: <span>${lastWeights[ex].gewicht_kg} kg × ${lastWeights[ex].wiederholungen}</span>`;
-        wrapper.appendChild(hint);
-      }
+      // Letzte Session erscheint nach Übungsauswahl als Box
 
       container.appendChild(wrapper);
     });
@@ -589,7 +662,7 @@
   //
   // NEU: Letztes Gewicht wird automatisch ins Eingabefeld eingetragen
 
-  function selectExercise(name) {
+  async function selectExercise(name) {
     state.currentExercise = name;
     state.currentSets = [];
 
@@ -599,14 +672,15 @@
     document.getElementById('setsLogRows').innerHTML = '';
     document.getElementById('finishExBtn').disabled = true;
 
-    // Letztes Gewicht vorausfüllen
-    if (lastWeights[name]) {
-      document.getElementById('inputWeight').value = lastWeights[name].gewicht_kg;
-      document.getElementById('inputReps').value   = lastWeights[name].wiederholungen;
-    } else {
-      document.getElementById('inputWeight').value = '';
-      document.getElementById('inputReps').value   = '';
-    }
+    // Felder leer lassen – Nutzer entscheidet selbst
+    document.getElementById('inputWeight').value = '';
+    document.getElementById('inputReps').value   = '';
+
+    // Letzte Session laden
+    const box = document.getElementById('lastSessionBox');
+    box.innerHTML = '<div style="font-size:0.78rem;color:var(--muted);padding:4px 0">⏳ Lade letztes Training...</div>';
+    const session = await loadLastSession(name);
+    renderLastSession(session);
 
     renderExerciseButtons();
 
