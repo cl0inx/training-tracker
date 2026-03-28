@@ -237,6 +237,14 @@
     font-size: 0.72rem; color: var(--muted);
     text-transform: uppercase; letter-spacing: 1px;
   }
+
+  /* PIN Eingabefeld shake-Animation bei falschem PIN */
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-8px); }
+    40%, 80% { transform: translateX(8px); }
+  }
+  .shake { animation: shake 0.4s ease; }
 </style>
 </head>
 <body>
@@ -254,7 +262,7 @@
 </header>
 
 
-<!-- SCREEN 0: Nutzerauswahl -->
+<!-- SCREEN 0: Login -->
 <div class="screen active" id="screen-user">
   <div class="steps">
     <div class="step-dot active"></div>
@@ -263,17 +271,33 @@
     <div class="step-dot"></div>
   </div>
   <div class="section-label">Wer<br><span>trainiert heute?</span></div>
-  <div class="card-grid">
-    <div class="type-card" onclick="selectUser('Colin')">
+
+  <!-- Schritt 1: Nutzer wählen -->
+  <div id="userSelectCards" class="card-grid">
+    <div class="type-card" onclick="chooseUser('Colin')">
       <div class="icon">🏋️</div>
       <div class="name">Colin</div>
-      <div class="sub">Dein Training</div>
     </div>
-    <div class="type-card" onclick="selectUser('Chantal')">
+    <div class="type-card" onclick="chooseUser('Chantal')">
       <div class="icon">🌟</div>
       <div class="name">Chantal</div>
-      <div class="sub">Ihr Training</div>
     </div>
+  </div>
+
+  <!-- Schritt 2: PIN eingeben (startet versteckt) -->
+  <div id="pinSection" style="display:none; flex-direction:column; gap:14px;">
+    <div class="current-exercise-badge">
+      <div class="dot"></div>
+      <span id="pinUserLabel"></span>
+    </div>
+    <div class="input-group">
+      <label>PIN eingeben</label>
+      <input type="password" id="pinInput" placeholder="••••"
+             inputmode="numeric" maxlength="8"
+             style="font-size:2rem;letter-spacing:6px;text-align:center;">
+    </div>
+    <button class="btn-primary" onclick="verifyPin()">Anmelden →</button>
+    <button class="btn-back" onclick="cancelPin()">← Zurück</button>
   </div>
 </div>
 
@@ -572,14 +596,9 @@
   // APP DATEN & STATE
   // ═══════════════════════════════════════════════════════
 
-  const EXERCISES = {
-    'Beine':  ['Squats', 'LH Schulterdrücken', 'RDL', 'Seitheben am Kabel'],
-    'Brust':  ['Bench', 'Dips', 'Schrägbankdrücken', 'Überkopfzüge'],
-    'Rücken': ['Klimmzüge', 'LH Curls', 'Einarm Rudern', 'Kabelcurls']
-  };
+  // Kein hardcoded EXERCISES mehr – alles kommt aus Supabase
+  // state.allExercises wird nach Login pro Trainingsart befüllt
 
-  // lastWeights speichert die letzten Gewichte aller Übungen
-  // { 'Bench': { gewicht_kg: 80, wiederholungen: 8 }, ... }
   let lastWeights = {};
 
   let state = {
@@ -588,7 +607,8 @@
     currentExercise: null,
     currentSets: [],
     completedExercises: [],
-    customExercises: []    // Eigene Übungen aus Supabase
+    customExercises: [],   // wird nicht mehr separat gebraucht
+    allExercises: {}       // { 'Beine': ['Squats', ...], 'Brust': [...], ... }
   };
 
   // Heutiges Datum als ISO-String (2026-03-27) für die Datenbank
@@ -608,22 +628,9 @@
 
   // Letzte Gewichte für alle Übungen vorladen
   // (damit sie sofort da sind wenn der Nutzer eine Übung wählt)
-  async function preloadLastWeights() {
-    // Alle Übungen aus allen Trainingsarten in einem flachen Array sammeln
-    // Object.values() gibt alle Werte eines Objekts zurück
-    // flat() macht aus [[a,b],[c,d]] → [a,b,c,d]
-    const alleUebungen = Object.values(EXERCISES).flat();
-
-    // Für jede Übung parallel das letzte Gewicht laden
-    // Promise.all() wartet bis ALLE Anfragen fertig sind
-    await Promise.all(alleUebungen.map(async (uebung) => {
-      const last = await loadLastWeight(uebung);
-      if (last) lastWeights[uebung] = last;
-    }));
-  }
-
-  // Letzte Gewichte werden erst nach Nutzerauswahl geladen (in selectUser)
-  // preloadLastWeights(); ← nicht beim Start, erst nach Nutzerauswahl
+  // Letzte Gewichte werden nicht mehr vorgeladen
+  // Stattdessen: letzte Session wird bei Übungsauswahl geladen (loadLastSession)
+  async function preloadLastWeights() { /* nicht mehr benötigt */ }
 
   // ═══════════════════════════════════════════════════════
   // SCREEN-NAVIGATION
@@ -636,23 +643,106 @@
   }
 
   // ═══════════════════════════════════════════════════════
-  // NUTZER WÄHLEN
+  // LOGIN & PIN-VERIFIZIERUNG
   // ═══════════════════════════════════════════════════════
-  // Wird aufgerufen wenn Colin oder Chantal angetippt wird.
-  // Lädt danach die letzten Gewichte für diesen Nutzer
-  // damit die Vorausfüllung nutzerspezifisch ist.
 
-  async function selectUser(name) {
+  let pendingUser = null; // Nutzer der gerade seinen PIN eingibt
+
+  // Schritt 1: Nutzer antippen → PIN-Eingabe zeigen
+  function chooseUser(name) {
+    pendingUser = name;
+    document.getElementById('userSelectCards').style.display = 'none';
+    document.getElementById('pinSection').style.display = 'flex';
+    document.getElementById('pinUserLabel').textContent = name;
+    document.getElementById('pinInput').value = '';
+    document.getElementById('pinInput').focus();
+  }
+
+  // Zurück zur Nutzerauswahl
+  function cancelPin() {
+    pendingUser = null;
+    document.getElementById('pinSection').style.display = 'none';
+    document.getElementById('userSelectCards').style.display = 'grid';
+    document.getElementById('pinInput').value = '';
+  }
+
+  // SHA-256 Hash im Browser berechnen (Web Crypto API)
+  // Diese API ist in jedem modernen Browser eingebaut
+  async function sha256(text) {
+    const encoder = new TextEncoder();
+    const data    = encoder.encode(text);
+    const hash    = await crypto.subtle.digest('SHA-256', data);
+    // Hash als Hex-String zurückgeben (wie in Supabase gespeichert)
+    return Array.from(new Uint8Array(hash))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
+  // Schritt 2: PIN prüfen
+  async function verifyPin() {
+    const pin = document.getElementById('pinInput').value.trim();
+    if (!pin) { showToast('Bitte PIN eingeben', 'error'); return; }
+
+    const pinHash = await sha256(pin);
+
+    // Hash mit Supabase vergleichen
+    const url = `${SUPABASE_URL}/rest/v1/nutzer`
+      + `?name=eq.${encodeURIComponent(pendingUser)}`
+      + `&pin_hash=eq.${pinHash}`
+      + `&select=name`;
+
+    const res  = await fetch(url, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const data = await res.json();
+
+    if (!data || data.length === 0) {
+      // Falscher PIN → Shake-Animation + Fehler
+      const input = document.getElementById('pinInput');
+      input.classList.add('shake');
+      input.value = '';
+      setTimeout(() => input.classList.remove('shake'), 400);
+      showToast('Falscher PIN', 'error');
+      return;
+    }
+
+    // PIN korrekt → einloggen
+    await loginUser(pendingUser);
+  }
+
+  // Nutzer einloggen: Übungen laden, zur Trainingsart-Auswahl
+  async function loginUser(name) {
     state.nutzer = name;
+    document.getElementById('connText').textContent = name + ' · ✓';
+    document.getElementById('connBadge').className = 'connection-badge ok';
 
-    // Header aktualisieren: Name anzeigen
-    document.getElementById('connText').textContent = name + ' · Supabase ✓';
-
-    // Letzte Gewichte für diesen Nutzer neu laden
-    lastWeights = {};
-    await preloadLastWeights();
+    // Alle Übungen dieses Nutzers aus Supabase laden
+    await loadAllExercises();
 
     showScreen('screen-type');
+  }
+
+  // Alle Übungen aus Supabase laden (alle Trainingsarten auf einmal)
+  async function loadAllExercises() {
+    const url = `${SUPABASE_URL}/rest/v1/uebungen`
+      + `?nutzer=eq.${encodeURIComponent(state.nutzer)}`
+      + `&select=name,trainingsart`
+      + `&order=created_at.asc`;
+
+    const res  = await fetch(url, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const data = await res.json();
+
+    // Nach Trainingsart gruppieren
+    // { 'Beine': ['Squats', 'RDL', ...], 'Brust': [...], ... }
+    state.allExercises = {};
+    data.forEach(row => {
+      if (!state.allExercises[row.trainingsart]) {
+        state.allExercises[row.trainingsart] = [];
+      }
+      state.allExercises[row.trainingsart].push(row.name);
+    });
   }
 
   // ═══════════════════════════════════════════════════════
@@ -697,8 +787,8 @@
 
   function renderExerciseButtons() {
     const container  = document.getElementById('exerciseButtons');
-    // Standard-Übungen + eigene Übungen zusammenführen
-    const exercises  = [...(EXERCISES[state.type] || []), ...state.customExercises];
+    // Übungen kommen jetzt komplett aus Supabase (state.allExercises)
+    const exercises  = state.allExercises[state.type] || [];
     const doneNames  = state.completedExercises.map(e => e.name);
     container.innerHTML = '';
 
@@ -732,25 +822,9 @@
   // EIGENE ÜBUNGEN
   // ═══════════════════════════════════════════════════════
 
-  // Eigene Übungen aus Supabase laden (gefiltert nach Nutzer + Trainingsart)
+  // Übungen nach Hinzufügen neu laden (nur aktuelle Trainingsart)
   async function loadCustomExercises() {
-    const url = `${SUPABASE_URL}/rest/v1/uebungen`
-      + `?select=name`
-      + `&nutzer=eq.${encodeURIComponent(state.nutzer)}`
-      + `&trainingsart=eq.${encodeURIComponent(state.type)}`
-      + `&order=created_at.asc`;
-
-    try {
-      const res = await fetch(url, {
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      // Nur die Namen extrahieren → ['Bulgarian SS', 'Hackenschmidt']
-      state.customExercises = data.map(d => d.name);
-    } catch {
-      state.customExercises = [];
-    }
+    await loadAllExercises();
   }
 
   // Formular einblenden
@@ -776,7 +850,7 @@
     if (!name) { showToast('Bitte einen Namen eingeben', 'error'); return; }
 
     // Doppelte verhindern
-    const alle = [...(EXERCISES[state.type] || []), ...state.customExercises];
+    const alle = state.allExercises[state.type] || [];
     if (alle.includes(name)) { showToast('Übung existiert bereits', 'error'); return; }
 
     try {
@@ -792,8 +866,8 @@
 
       if (!res.ok) throw new Error();
 
-      // Lokal hinzufügen und Buttons neu rendern
-      state.customExercises.push(name);
+      // Übungen neu laden und Buttons aktualisieren
+      await loadAllExercises();
       hideAddForm();
       renderExerciseButtons();
       showToast(`✓ "${name}" hinzugefügt`, 'success');
@@ -1014,8 +1088,14 @@
   // ═══════════════════════════════════════════════════════
 
   function resetAll() {
-    state = { nutzer: null, type: null, currentExercise: null, currentSets: [], completedExercises: [], customExercises: [] };
+    state = { nutzer: null, type: null, currentExercise: null, currentSets: [], completedExercises: [], customExercises: [], allExercises: {} };
     lastWeights = {};
+    // PIN-Screen zurücksetzen
+    document.getElementById('pinSection').style.display = 'none';
+    document.getElementById('userSelectCards').style.display = 'grid';
+    document.getElementById('pinInput').value = '';
+    document.getElementById('connText').textContent = 'Verbinde...';
+    document.getElementById('connBadge').className = 'connection-badge';
     showScreen('screen-user');
   }
 
@@ -1039,6 +1119,9 @@
   });
   document.getElementById('inputWeight').addEventListener('keydown', e => {
     if (e.key === 'Enter') document.getElementById('inputReps').focus();
+  });
+  document.getElementById('pinInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') verifyPin();
   });
 
 </script>
