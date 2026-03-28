@@ -928,7 +928,7 @@
   // falls vorhanden ("Zuletzt: 80 kg × 8")
 
   function renderExerciseButtons() {
-    const standardUebungen = STANDARD_EXERCISES[state.type] || [];
+    const standardUebungen = [];
     const container  = document.getElementById('exerciseButtons');
     // Übungen kommen jetzt komplett aus Supabase (state.allExercises)
     const exercises  = state.allExercises[state.type] || [];
