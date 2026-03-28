@@ -245,6 +245,65 @@
     40%, 80% { transform: translateX(8px); }
   }
   .shake { animation: shake 0.4s ease; }
+
+  /* ── AUSWERTUNGS-SCREEN ── */
+  .stats-header {
+    display: flex; justify-content: space-between;
+    align-items: center; flex-wrap: wrap; gap: 10px;
+  }
+  .period-tabs {
+    display: flex; gap: 6px;
+  }
+  .period-tab {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: 20px; padding: 5px 12px; font-size: 0.78rem;
+    font-family: 'DM Sans', sans-serif; color: var(--muted);
+    cursor: pointer; transition: all 0.2s;
+  }
+  .period-tab.active {
+    background: var(--accent); color: #0d0d0d;
+    border-color: var(--accent); font-weight: 600;
+  }
+  .exercise-select {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: 10px; color: var(--text); font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem; padding: 12px 14px; width: 100%; outline: none;
+    transition: border-color 0.2s; cursor: pointer;
+  }
+  .exercise-select:focus { border-color: var(--accent); }
+  .pr-block {
+    background: var(--surface); border-radius: var(--radius);
+    border: 1px solid var(--border); padding: 16px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .pr-row {
+    display: flex; justify-content: space-between;
+    align-items: center; padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .pr-row:last-child { border-bottom: none; }
+  .pr-label { font-size: 0.85rem; color: var(--muted); }
+  .pr-value { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; color: var(--accent); }
+  .pr-date  { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+  .chart-container {
+    background: var(--surface); border-radius: var(--radius);
+    border: 1px solid var(--border); padding: 16px;
+    position: relative; height: 220px;
+  }
+  .chart-placeholder {
+    display: flex; align-items: center; justify-content: center;
+    height: 100%; color: var(--muted); font-size: 0.85rem;
+  }
+  .stats-nav-btn {
+    position: fixed; bottom: 24px; right: 20px;
+    background: var(--accent); color: #0d0d0d;
+    border: none; border-radius: 30px; padding: 12px 20px;
+    font-family: 'Bebas Neue', sans-serif; font-size: 1rem;
+    letter-spacing: 1px; cursor: pointer; z-index: 50;
+    box-shadow: 0 4px 20px rgba(232,255,71,0.3);
+    transition: transform 0.1s, opacity 0.2s;
+  }
+  .stats-nav-btn:active { transform: scale(0.96); }
 </style>
 </head>
 <body>
@@ -252,7 +311,11 @@
 <header>
   <div class="logo">LOGBOOK</div>
   <div style="display:flex;gap:8px;align-items:center;">
-    <!-- Verbindungsstatus zu Supabase -->
+    <!-- Stats Button – nur nach Login sichtbar -->
+    <button class="btn-back" id="statsBtn" onclick="showStats()"
+            style="display:none; color:var(--accent); font-weight:600;">
+      📊
+    </button>
     <div class="connection-badge" id="connBadge">
       <div class="connection-dot"></div>
       <span id="connText">Verbinde...</span>
@@ -316,17 +379,17 @@
     <div class="type-card" onclick="selectType('Beine')">
       <div class="icon">🦵</div>
       <div class="name">Beine</div>
-      <div class="sub">4 Übungen</div>
+      <div class="sub" id="count-Beine">Lädt...</div>
     </div>
     <div class="type-card" onclick="selectType('Brust')">
       <div class="icon">💪</div>
       <div class="name">Brust</div>
-      <div class="sub">4 Übungen</div>
+      <div class="sub" id="count-Brust">Lädt...</div>
     </div>
     <div class="type-card" onclick="selectType('Rücken')">
       <div class="icon">🏋️</div>
       <div class="name">Rücken</div>
-      <div class="sub">4 Übungen</div>
+      <div class="sub" id="count-Rücken">Lädt...</div>
     </div>
   </div>
 </div>
@@ -423,6 +486,73 @@
   </div>
 
   <button class="btn-danger" onclick="resetAll()">Neues Training starten</button>
+</div>
+
+<!-- SCREEN 4: Auswertungen -->
+<div class="screen" id="screen-stats">
+  <div style="display:flex;justify-content:space-between;align-items:center;">
+    <div class="section-label"><span>Auswertung</span></div>
+    <button class="btn-back" onclick="showScreen('screen-type')">← Zurück</button>
+  </div>
+
+  <!-- Übung wählen -->
+  <div class="input-group">
+    <label>Übung</label>
+    <select class="exercise-select" id="statsExerciseSelect" onchange="loadStats()">
+      <option value="">– Übung wählen –</option>
+    </select>
+  </div>
+
+  <!-- Zeitraum wählen -->
+  <div class="period-tabs" id="periodTabs">
+    <button class="period-tab active" onclick="setPeriod(30, this)">4 Wo</button>
+    <button class="period-tab" onclick="setPeriod(90, this)">3 Mo</button>
+    <button class="period-tab" onclick="setPeriod(180, this)">6 Mo</button>
+    <button class="period-tab" onclick="setPeriod(9999, this)">Alles</button>
+  </div>
+
+  <!-- Persönliche Bestleistung -->
+  <div id="prBlock" style="display:none;">
+    <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Persönliche Bestleistungen</div>
+    <div class="pr-block">
+      <div class="pr-row">
+        <div>
+          <div class="pr-label">Höchstes Gewicht</div>
+          <div class="pr-date" id="prMaxWeightDate"></div>
+        </div>
+        <div style="text-align:right">
+          <div class="pr-value" id="prMaxWeight">–</div>
+        </div>
+      </div>
+      <div class="pr-row">
+        <div>
+          <div class="pr-label">Bestes Volumen (Session)</div>
+          <div class="pr-date" id="prMaxVolDate"></div>
+        </div>
+        <div style="text-align:right">
+          <div class="pr-value" id="prMaxVol">–</div>
+        </div>
+      </div>
+      <div class="pr-row">
+        <div>
+          <div class="pr-label">Trainingseinheiten</div>
+        </div>
+        <div style="text-align:right">
+          <div class="pr-value" id="prSessions">–</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Volumen Chart -->
+  <div id="chartBlock" style="display:none;">
+    <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Volumen über Zeit</div>
+    <div class="chart-container">
+      <canvas id="volumeChart"></canvas>
+      <div class="chart-placeholder" id="chartPlaceholder">Übung wählen</div>
+    </div>
+  </div>
+
 </div>
 
 <div class="toast" id="toast"></div>
@@ -716,8 +846,17 @@
     document.getElementById('connText').textContent = name + ' · ✓';
     document.getElementById('connBadge').className = 'connection-badge ok';
 
-    // Alle Übungen dieses Nutzers aus Supabase laden
+  // Alle Übungen dieses Nutzers aus Supabase laden
     await loadAllExercises();
+
+  // Übungsanzahl dynamisch aus Datenbank setzen
+  ['Beine', 'Brust', 'Rücken'].forEach(art => {
+    const anzahl = (state.allExercises[art] || []).length;
+    document.getElementById('count-' + art).textContent = anzahl + ' Übungen';
+  });
+
+    // Stats-Button im Header einblenden
+    showStatsButton();
 
     showScreen('screen-type');
   }
@@ -1124,6 +1263,132 @@
     if (e.key === 'Enter') verifyPin();
   });
 
+  // ═══════════════════════════════════════════════════════
+  // AUSWERTUNGEN & STATISTIKEN
+  // ═══════════════════════════════════════════════════════
+
+  let statsPeriodDays = 30;
+  let volumeChartInstance = null;
+
+  function showStats() {
+    const select = document.getElementById('statsExerciseSelect');
+    select.innerHTML = '<option value="">– Übung wählen –</option>';
+    Object.values(state.allExercises).flat().forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      select.appendChild(opt);
+    });
+    showScreen('screen-stats');
+  }
+
+  function setPeriod(days, btn) {
+    statsPeriodDays = days;
+    document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    if (document.getElementById('statsExerciseSelect').value) loadStats();
+  }
+
+  async function loadStats() {
+    const uebung = document.getElementById('statsExerciseSelect').value;
+    if (!uebung) return;
+
+    const vonDatum = statsPeriodDays === 9999
+      ? '2000-01-01'
+      : new Date(Date.now() - statsPeriodDays * 86400000).toISOString().split('T')[0];
+
+    const url = `${SUPABASE_URL}/rest/v1/${TABLE}`
+      + `?select=datum,gewicht_kg,wiederholungen,satz`
+      + `&uebung=eq.${encodeURIComponent(uebung)}`
+      + `&nutzer=eq.${encodeURIComponent(state.nutzer)}`
+      + `&datum=gte.${vonDatum}`
+      + `&order=datum.asc,satz.asc`;
+
+    const res   = await fetch(url, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+    const daten = await res.json();
+
+    if (!daten.length) {
+      document.getElementById('prBlock').style.display    = 'none';
+      document.getElementById('chartBlock').style.display = 'none';
+      document.getElementById('chartPlaceholder').textContent  = 'Keine Daten im gewählten Zeitraum';
+      document.getElementById('chartPlaceholder').style.display = 'flex';
+      return;
+    }
+
+    renderPR(daten);
+    renderVolumeChart(daten);
+  }
+
+  function renderPR(daten) {
+    const maxGewicht = daten.reduce((max, d) => d.gewicht_kg > max.gewicht_kg ? d : max, daten[0]);
+
+    const volProTag = {};
+    daten.forEach(d => {
+      volProTag[d.datum] = (volProTag[d.datum] || 0) + d.gewicht_kg * d.wiederholungen;
+    });
+
+    const besteDatum = Object.entries(volProTag).reduce((max, [d, v]) => v > max[1] ? [d, v] : max, ['', 0]);
+    const sessions   = Object.keys(volProTag).length;
+
+    const fmtDate = iso => { const [j,m,t] = iso.split('-'); return `${t}.${m}.${j}`; };
+
+    document.getElementById('prMaxWeight').textContent     = `${maxGewicht.gewicht_kg} kg`;
+    document.getElementById('prMaxWeightDate').textContent  = fmtDate(maxGewicht.datum);
+    document.getElementById('prMaxVol').textContent         = `${Math.round(besteDatum[1])} kg`;
+    document.getElementById('prMaxVolDate').textContent     = fmtDate(besteDatum[0]);
+    document.getElementById('prSessions').textContent       = sessions;
+    document.getElementById('prBlock').style.display        = 'block';
+  }
+
+  function renderVolumeChart(daten) {
+    const volProTag = {};
+    daten.forEach(d => {
+      volProTag[d.datum] = (volProTag[d.datum] || 0) + d.gewicht_kg * d.wiederholungen;
+    });
+
+    const labels = Object.keys(volProTag).map(iso => { const [j,m,t] = iso.split('-'); return `${t}.${m}`; });
+    const values = Object.values(volProTag).map(v => Math.round(v));
+
+    if (volumeChartInstance) { volumeChartInstance.destroy(); volumeChartInstance = null; }
+
+    document.getElementById('chartPlaceholder').style.display = 'none';
+    document.getElementById('chartBlock').style.display        = 'block';
+
+    const ctx = document.getElementById('volumeChart').getContext('2d');
+    volumeChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Volumen (kg)',
+          data: values,
+          borderColor: '#e8ff47',
+          backgroundColor: 'rgba(232,255,71,0.08)',
+          borderWidth: 2,
+          pointBackgroundColor: '#e8ff47',
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: true,
+          tension: 0.3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#888', font: { size: 10 }, maxRotation: 45, maxTicksLimit: 8 }, grid: { color: '#2e2e2e' } },
+          y: { ticks: { color: '#888', font: { size: 10 } }, grid: { color: '#2e2e2e' } }
+        }
+      }
+    });
+  }
+
+  function showStatsButton() {
+    document.getElementById('statsBtn').style.display = 'block';
+  }
+
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </body>
 </html>
