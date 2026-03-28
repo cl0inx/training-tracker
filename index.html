@@ -463,6 +463,9 @@
     <button class="btn-secondary" onclick="goToSummary()" id="goSummaryBtn" style="display:none">
       Training abschließen →
     </button>
+    <button class="btn-secondary" id="editModeBtn" onclick="toggleEditMode()">
+      Übungen bearbeiten
+    </button>
   </div>
 </div>
 
@@ -925,6 +928,7 @@
   // falls vorhanden ("Zuletzt: 80 kg × 8")
 
   function renderExerciseButtons() {
+    const standardUebungen = STANDARD_EXERCISES[state.type] || [];
     const container  = document.getElementById('exerciseButtons');
     // Übungen kommen jetzt komplett aus Supabase (state.allExercises)
     const exercises  = state.allExercises[state.type] || [];
@@ -938,11 +942,25 @@
       const btn = document.createElement('button');
       btn.className = 'exercise-btn' + (doneNames.includes(ex) ? ' selected' : '');
 
-      btn.innerHTML = doneNames.includes(ex)
-        ? `✓ ${ex} <span style="color:var(--muted);font-size:0.8rem">(${state.completedExercises.find(e=>e.name===ex).sets.length} Sätze)</span>`
-        : ex;
-
-      if (!doneNames.includes(ex)) btn.onclick = () => selectExercise(ex);
+      if (editMode && !standardUebungen.includes(ex)) {
+        // Edit-Modus: Löschen-Button zeigen
+        btn.style.display        = 'flex';
+        btn.style.justifyContent = 'space-between';
+        btn.style.alignItems     = 'center';
+        btn.innerHTML = `
+          <span>${ex}</span>
+          <span onclick="event.stopPropagation(); deleteExercise('${ex}')"
+                style="color:var(--accent2);font-size:1.1rem;padding:2px 6px;">✕</span>
+        `;
+      } else if (doneNames.includes(ex)) {
+        // Übung bereits abgeschlossen
+        btn.innerHTML = `✓ ${ex} <span style="color:var(--muted);font-size:0.8rem">(${state.completedExercises.find(e=>e.name===ex).sets.length} Sätze)</span>`;
+      } else {
+        // Normal: Übung wählbar
+        btn.innerHTML = ex;
+        btn.onclick   = () => selectExercise(ex);
+      }
+      
       wrapper.appendChild(btn);
       container.appendChild(wrapper);
     });
@@ -983,6 +1001,69 @@
     document.getElementById('newExerciseName').value = '';
   }
 
+  // ── EDIT MODUS ──────────────────────────────────────────
+
+  // Speichert ob Edit-Modus aktiv ist
+  let editMode = false;
+
+  function toggleEditMode() {
+    // Umschalten: war false → wird true, war true → wird false
+    editMode = !editMode;
+
+    // Button-Text je nach Zustand ändern
+    const btn = document.getElementById('editModeBtn');
+    btn.textContent = editMode ? 'Fertig ✓' : 'Übungen bearbeiten';
+    btn.style.borderColor = editMode ? 'var(--accent)' : '';
+    btn.style.color       = editMode ? 'var(--accent)' : '';
+
+    // Buttons neu rendern – jetzt mit oder ohne ✕
+    renderExerciseButtons();
+  }
+
+  // Übung löschen
+  async function deleteExercise(name) {
+    // Sicherheitsabfrage – window.confirm öffnet einen Browser-Dialog
+    // "Bist du sicher?" → OK = true, Abbrechen = false
+    const bestaetigt = window.confirm(`"${name}" wirklich löschen?`);
+    if (!bestaetigt) return;
+
+    try {
+      // DELETE Request an Supabase
+      // Filtert nach Name UND Nutzer – nur diese eine Übung wird gelöscht
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/uebungen`
+        + `?name=eq.${encodeURIComponent(name)}`
+        + `&nutzer=eq.${encodeURIComponent(state.nutzer)}`,
+        {
+          method:  'DELETE',
+          headers: {
+            'apikey':        SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Prefer':        'return=minimal'
+          }
+        }
+      );
+
+      if (!res.ok) throw new Error();
+
+      // Lokal aus state.allExercises entfernen
+      // filter() gibt ein neues Array zurück ohne das gelöschte Element
+      state.allExercises[state.type] = state.allExercises[state.type]
+        .filter(ex => ex !== name);
+
+      // Anzahl auf Trainingsart-Karte aktualisieren
+      const anzahl = state.allExercises[state.type].length;
+      const countEl = document.getElementById('count-' + state.type);
+      if (countEl) countEl.textContent = anzahl + ' Übungen';
+
+      renderExerciseButtons();
+      showToast(`"${name}" gelöscht`, 'success');
+
+    } catch {
+      showToast('Fehler beim Löschen', 'error');
+    }
+  }
+  
   // Neue Übung in Supabase speichern
   async function saveNewExercise() {
     const name = document.getElementById('newExerciseName').value.trim();
