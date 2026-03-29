@@ -572,6 +572,10 @@
   // Die Tabelle in die wir schreiben (muss in Supabase existieren)
   const TABLE = 'training';
 
+   // Supabase Client initialisieren (nutzt die JS SDK)
+  // Dieser Client kümmert sich um Login, Session, Token – alles automatisch
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
   // ═══════════════════════════════════════════════════════
   // SUPABASE HILFSFUNKTIONEN
   // ═══════════════════════════════════════════════════════
@@ -766,10 +770,6 @@
   // ═══════════════════════════════════════════════════════
   // SUPABASE AUTH
   // ═══════════════════════════════════════════════════════
-
-  // Supabase Client initialisieren (nutzt die JS SDK)
-  // Dieser Client kümmert sich um Login, Session, Token – alles automatisch
-  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   
   // Login mit E-Mail + Passwort
   async function loginWithEmail() {
