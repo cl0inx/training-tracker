@@ -1445,12 +1445,15 @@
     const uebung = document.getElementById('statsExerciseSelect').value;
     if (!uebung) return;
 
+    // Ist diese Übung eine Cardio-Übung?
+    const isCardio = (state.allExercises['Cardio'] || []).includes(uebung);
+
     const vonDatum = statsPeriodDays === 9999
       ? '2000-01-01'
       : new Date(Date.now() - statsPeriodDays * 86400000).toISOString().split('T')[0];
 
     const url = `${SUPABASE_URL}/rest/v1/${TABLE}`
-      + `?select=datum,gewicht_kg,wiederholungen,satz`
+      + `?select=datum,${isCardio ? 'zeit_minuten,runden' : 'gewicht_kg,wiederholungen,satz'}`
       + `&uebung=eq.${encodeURIComponent(uebung)}`
       + `&datum=gte.${vonDatum}`
       + `&order=datum.asc,satz.asc`;
@@ -1465,11 +1468,100 @@
       document.getElementById('chartPlaceholder').style.display = 'flex';
       return;
     }
+    
+    if (isCardio) {
+      renderCardioPR(daten);
+      renderCardioChart(daten);
+    } else {
+      renderPR(daten);
+      renderVolumeChart(daten);
+    }
 
-    renderPR(daten);
-    renderVolumeChart(daten);
+  function renderCardioPR(daten) {
+  // Beste Pace berechnen: niedrigste Zeit pro Runde
+  const mitPace = daten
+    .filter(d => d.runden > 0)
+    .map(d => ({ ...d, pace: d.zeit_minuten / d.runden }));
+
+  const bestePace  = mitPace.length ? Math.min(...mitPace.map(d => d.pace)) : null;
+  const laengste   = Math.max(...daten.map(d => d.zeit_minuten));
+  const meiste     = Math.max(...daten.map(d => d.runden || 0));
+
+  // Pace formatieren: 4.5 → "4:30 min/Runde"
+  const formatPace = p => {
+    const min = Math.floor(p);
+    const sek = Math.round((p - min) * 60).toString().padStart(2, '0');
+    return `${min}:${sek} min/Rd`;
+  };
+
+  const fmtDate = iso => { const [j,m,t] = iso.split('-'); return `${t}.${m}.${j}`; };
+  const sessions = new Set(daten.map(d => d.datum)).size;
+
+  document.getElementById('prMaxWeight').textContent     = bestePace ? formatPace(bestePace) : '–';
+  document.getElementById('prMaxWeightDate').textContent = 'Beste Pace';
+  document.getElementById('prMaxVol').textContent        = `${laengste} min`;
+  document.getElementById('prMaxVolDate').textContent    = 'Längste Einheit';
+  document.getElementById('prSessions').textContent      = sessions;
+  document.getElementById('prBlock').style.display       = 'block';
+}
+
+  function renderCardioChart(daten) {
+    // Pace pro Session berechnen
+    const paceProTag = {};
+    daten.forEach(d => {
+      if (d.runden > 0) {
+        // Besten Pace pro Tag nehmen (niedrigster Wert)
+        const pace = d.zeit_minuten / d.runden;
+        if (!paceProTag[d.datum] || pace < paceProTag[d.datum]) {
+          paceProTag[d.datum] = pace;
+        }
+      }
+    });
+  
+    const labels = Object.keys(paceProTag).map(iso => {
+      const [j,m,t] = iso.split('-'); return `${t}.${m}`;
+    });
+    const values = Object.values(paceProTag).map(p => Math.round(p * 100) / 100);
+  
+    if (volumeChartInstance) { volumeChartInstance.destroy(); volumeChartInstance = null; }
+  
+    document.getElementById('chartPlaceholder').style.display = 'none';
+    document.getElementById('chartBlock').style.display       = 'block';
+  
+    const ctx = document.getElementById('volumeChart').getContext('2d');
+    volumeChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Pace (min/Runde)',
+          data: values,
+          borderColor: '#ff5c3a',       // Orange für Cardio statt Gelb
+          backgroundColor: 'rgba(255,92,58,0.08)',
+          borderWidth: 2,
+          pointBackgroundColor: '#ff5c3a',
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: true,
+          tension: 0.3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#888', font: { size: 10 }, maxRotation: 45, maxTicksLimit: 8 }, grid: { color: '#2e2e2e' } },
+          y: {
+            ticks: { color: '#888', font: { size: 10 } },
+            grid: { color: '#2e2e2e' },
+            reverse: true  // niedrigere Pace = besser → Linie geht runter = Fortschritt
+          }
+        }
+      }
+    });
   }
-
+  
   function renderPR(daten) {
     const maxGewicht = daten.reduce((max, d) => d.gewicht_kg > max.gewicht_kg ? d : max, daten[0]);
 
