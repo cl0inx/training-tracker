@@ -1,0 +1,1458 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Training Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0d;
+    --surface: #1a1a1a;
+    --surface2: #242424;
+    --border: #2e2e2e;
+    --accent: #e8ff47;
+    --accent2: #ff5c3a;
+    --text: #f0f0f0;
+    --muted: #888;
+    --radius: 14px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 0 80px;
+  }
+
+  header {
+    width: 100%;
+    padding: 28px 20px 12px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 2px; color: var(--accent); line-height: 1; }
+  .date-badge { font-size: 0.75rem; color: var(--muted); background: var(--surface2); padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border); }
+
+  .screen { width: 100%; max-width: 480px; padding: 24px 20px; display: none; flex-direction: column; gap: 16px; }
+  .screen.active { display: flex; }
+
+  .steps { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+  .step-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); transition: background 0.3s; }
+  .step-dot.done { background: var(--accent); }
+  .step-dot.active { background: var(--accent); width: 24px; border-radius: 4px; }
+
+  .section-label { font-family: 'Bebas Neue', sans-serif; font-size: 1.7rem; letter-spacing: 1px; color: var(--text); line-height: 1.1; }
+  .section-label span { color: var(--accent); }
+
+  .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .type-card {
+    background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius);
+    padding: 20px 16px; cursor: pointer; transition: border-color 0.2s, background 0.2s, transform 0.1s;
+    text-align: left; display: flex; flex-direction: column; gap: 6px;
+  }
+  .type-card:active { transform: scale(0.97); }
+  .type-card:hover { border-color: var(--accent); background: #1e2200; }
+  .type-card .icon { font-size: 1.5rem; }
+  .type-card .name { font-weight: 600; font-size: 1rem; }
+  .type-card .sub  { font-size: 0.75rem; color: var(--muted); }
+
+  .exercise-btn {
+    background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius);
+    padding: 16px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem;
+    font-weight: 500; color: var(--text); text-align: left;
+    transition: border-color 0.2s, background 0.2s, transform 0.1s; width: 100%;
+  }
+  .exercise-btn:active { transform: scale(0.98); }
+  .exercise-btn.selected, .exercise-btn:hover { border-color: var(--accent); background: #1e2200; color: var(--accent); }
+
+  /* Letzte Session Box */
+  .last-session {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    animation: slideIn 0.2s ease;
+  }
+  .last-session-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+  }
+  .last-session-header .ex-date { color: var(--accent); font-weight: 600; }
+  .last-session-row {
+    display: grid;
+    grid-template-columns: 40px 1fr 1fr;
+    padding: 7px 14px;
+    font-size: 0.85rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .last-session-row:last-child { border-bottom: none; }
+  .last-session-num { color: var(--muted); font-size: 0.78rem; }
+  .last-session-val { font-weight: 600; text-align: center; color: var(--text); }
+
+  .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .input-group { display: flex; flex-direction: column; gap: 6px; }
+  .input-group label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 500; }
+  .input-group input {
+    background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px;
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 1.5rem; font-weight: 600;
+    padding: 14px; width: 100%; text-align: center; outline: none;
+    transition: border-color 0.2s; -webkit-appearance: none;
+  }
+  .input-group input:focus { border-color: var(--accent); }
+
+  .sets-log { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; }
+  .sets-log-header { display: grid; grid-template-columns: 32px 1fr 1fr 32px; padding: 8px 14px; font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); }
+  .set-row { display: grid; grid-template-columns: 32px 1fr 1fr 32px; padding: 10px 14px; font-size: 0.9rem; border-bottom: 1px solid var(--border); align-items: center; animation: slideIn 0.2s ease; }
+  .set-row:last-child { border-bottom: none; }
+  .set-num { color: var(--accent); font-weight: 700; font-size: 0.85rem; }
+  .set-val { font-weight: 600; text-align: center; }
+  .del-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; padding: 2px; text-align: right; }
+  .del-btn:hover { color: var(--accent2); }
+
+  /* Kleines Sync-Icon das zeigt ob ein Satz gerade gespeichert wird */
+  .set-sync { font-size: 0.7rem; color: var(--muted); text-align: right; }
+  .set-sync.saving { color: var(--accent); }
+  .set-sync.saved  { color: #4caf50; }
+  .set-sync.error  { color: var(--accent2); }
+
+  @keyframes slideIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+
+  .btn-primary {
+    background: var(--accent); color: #0d0d0d; border: none; border-radius: var(--radius);
+    padding: 16px; font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem;
+    letter-spacing: 1.5px; cursor: pointer; width: 100%; transition: opacity 0.2s, transform 0.1s;
+  }
+  .btn-primary:active { transform: scale(0.98); opacity: 0.9; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .btn-secondary {
+    background: transparent; color: var(--text); border: 1.5px solid var(--border);
+    border-radius: var(--radius); padding: 14px; font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem; font-weight: 500; cursor: pointer; width: 100%;
+    transition: border-color 0.2s, transform 0.1s;
+  }
+  .btn-secondary:active { transform: scale(0.98); }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-danger {
+    background: transparent; color: var(--accent2); border: 1.5px solid var(--accent2);
+    border-radius: var(--radius); padding: 14px; font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem; font-weight: 500; cursor: pointer; width: 100%;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .btn-danger:active { transform: scale(0.98); background: rgba(255,92,58,0.1); }
+
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 30px;
+    padding: 12px 22px; font-size: 0.85rem; font-weight: 500; color: var(--text);
+    white-space: nowrap; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); z-index: 99;
+  }
+  .toast.show    { transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: var(--accent);  color: var(--accent); }
+  .toast.error   { border-color: var(--accent2); color: var(--accent2); }
+
+  .summary-block { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .summary-exercise { display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .summary-exercise:last-child { border-bottom: none; }
+  .summary-ex-name { font-weight: 600; font-size: 0.9rem; }
+  .summary-ex-sets { font-size: 0.78rem; color: var(--muted); margin-top: 3px; }
+  .summary-count   { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; color: var(--accent); }
+
+  .current-exercise-badge { background: #1e2200; border: 1px solid var(--accent); border-radius: 8px; padding: 8px 14px; font-size: 0.85rem; color: var(--accent); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .current-exercise-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+
+  /* Status-Anzeige oben (Supabase verbunden / nicht verbunden) */
+  .connection-badge {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.72rem; color: var(--muted);
+    background: var(--surface2); padding: 4px 10px;
+    border-radius: 20px; border: 1px solid var(--border);
+  }
+  .connection-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+  .connection-badge.ok .connection-dot { background: #4caf50; }
+  .connection-badge.ok { color: #4caf50; border-color: #4caf5044; }
+  .connection-badge.err .connection-dot { background: var(--accent2); }
+  .connection-badge.err { color: var(--accent2); border-color: var(--accent244); }
+
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #0d0d0d; border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Zurück-Button */
+  .btn-back {
+    background: none; border: none; color: var(--muted);
+    font-family: 'DM Sans', sans-serif; font-size: 0.85rem;
+    cursor: pointer; padding: 0; display: flex; align-items: center; gap: 6px;
+    transition: color 0.2s;
+  }
+  .btn-back:hover { color: var(--text); }
+
+  /* Übung hinzufügen Formular */
+  .add-exercise-form {
+    background: var(--surface2);
+    border: 1.5px dashed var(--accent);
+    border-radius: var(--radius);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    animation: slideIn 0.2s ease;
+  }
+  .add-exercise-form input {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    font-weight: 500;
+    padding: 12px 14px;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .add-exercise-form input:focus { border-color: var(--accent); }
+  .add-exercise-form label {
+    font-size: 0.72rem; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+
+  /* PIN Eingabefeld shake-Animation bei falschem PIN */
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-8px); }
+    40%, 80% { transform: translateX(8px); }
+  }
+  .shake { animation: shake 0.4s ease; }
+
+  /* ── AUSWERTUNGS-SCREEN ── */
+  .stats-header {
+    display: flex; justify-content: space-between;
+    align-items: center; flex-wrap: wrap; gap: 10px;
+  }
+  .period-tabs {
+    display: flex; gap: 6px;
+  }
+  .period-tab {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: 20px; padding: 5px 12px; font-size: 0.78rem;
+    font-family: 'DM Sans', sans-serif; color: var(--muted);
+    cursor: pointer; transition: all 0.2s;
+  }
+  .period-tab.active {
+    background: var(--accent); color: #0d0d0d;
+    border-color: var(--accent); font-weight: 600;
+  }
+  .exercise-select {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: 10px; color: var(--text); font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem; padding: 12px 14px; width: 100%; outline: none;
+    transition: border-color 0.2s; cursor: pointer;
+  }
+  .exercise-select:focus { border-color: var(--accent); }
+  .pr-block {
+    background: var(--surface); border-radius: var(--radius);
+    border: 1px solid var(--border); padding: 16px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .pr-row {
+    display: flex; justify-content: space-between;
+    align-items: center; padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .pr-row:last-child { border-bottom: none; }
+  .pr-label { font-size: 0.85rem; color: var(--muted); }
+  .pr-value { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; color: var(--accent); }
+  .pr-date  { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+  .chart-container {
+    background: var(--surface); border-radius: var(--radius);
+    border: 1px solid var(--border); padding: 16px;
+    position: relative; height: 220px;
+  }
+  .chart-placeholder {
+    display: flex; align-items: center; justify-content: center;
+    height: 100%; color: var(--muted); font-size: 0.85rem;
+  }
+  .stats-nav-btn {
+    position: fixed; bottom: 24px; right: 20px;
+    background: var(--accent); color: #0d0d0d;
+    border: none; border-radius: 30px; padding: 12px 20px;
+    font-family: 'Bebas Neue', sans-serif; font-size: 1rem;
+    letter-spacing: 1px; cursor: pointer; z-index: 50;
+    box-shadow: 0 4px 20px rgba(232,255,71,0.3);
+    transition: transform 0.1s, opacity 0.2s;
+  }
+  .stats-nav-btn:active { transform: scale(0.96); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">LOGBOOK</div>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <!-- Stats Button – nur nach Login sichtbar -->
+    <button class="btn-back" id="statsBtn" onclick="showStats()"
+            style="display:none; color:var(--accent); font-weight:600;">
+      📊
+    </button>
+    <div class="connection-badge" id="connBadge">
+      <div class="connection-dot"></div>
+      <span id="connText">Verbinde...</span>
+    </div>
+    <div class="date-badge" id="dateBadge"></div>
+  </div>
+</header>
+
+
+<!-- SCREEN 0: Login -->
+<div class="screen active" id="screen-user">
+  <div class="steps">
+    <div class="step-dot active"></div>
+    <div class="step-dot"></div>
+    <div class="step-dot"></div>
+    <div class="step-dot"></div>
+  </div>
+  <div class="section-label">Willkommen<br><span>bei Logbook</span></div>
+
+  <div style="display:flex;flex-direction:column;gap:14px;">
+    <div class="input-group">
+      <label>E-Mail</label>
+      <input type="email" id="loginEmail" placeholder="deine@email.de"
+             inputmode="email" autocomplete="email"
+             style="font-size:1rem;text-align:left;padding:14px;">
+    </div>
+    <div class="input-group">
+      <label>Passwort</label>
+      <input type="password" id="loginPassword" placeholder="••••••••"
+             autocomplete="current-password"
+             style="font-size:1rem;text-align:left;padding:14px;">
+    </div>
+    <button class="btn-primary" onclick="loginWithEmail()">Anmelden →</button>
+    <div id="loginError" style="font-size:0.82rem;color:var(--accent2);text-align:center;display:none;">
+      E-Mail oder Passwort falsch
+    </div>
+  </div>
+</div>
+
+
+<!-- SCREEN 1: Trainingsart -->
+<div class="screen" id="screen-type">
+  <div class="steps">
+    <div class="step-dot done"></div>
+    <div class="step-dot active"></div>
+    <div class="step-dot"></div>
+    <div class="step-dot"></div>
+  </div>
+  <button class="btn-back" onclick="logoutUser()" style="color:var(--muted);">Abmelden</button>
+  <div class="section-label">Was trainierst<br><span>du heute?</span></div>
+  <div class="card-grid">
+    <div class="type-card" onclick="selectType('Beine')">
+      <div class="icon">🦵</div>
+      <div class="name">Beine</div>
+      <div class="sub" id="count-Beine">Lädt...</div>
+    </div>
+    <div class="type-card" onclick="selectType('Brust')">
+      <div class="icon">💪</div>
+      <div class="name">Brust</div>
+      <div class="sub" id="count-Brust">Lädt...</div>
+    </div>
+    <div class="type-card" onclick="selectType('Rücken')">
+      <div class="icon">🏋️</div>
+      <div class="name">Rücken</div>
+      <div class="sub" id="count-Rücken">Lädt...</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- SCREEN 2: Übung & Sätze -->
+<div class="screen" id="screen-exercise">
+  <div class="steps">
+    <div class="step-dot done"></div>
+    <div class="step-dot done"></div>
+    <div class="step-dot active"></div>
+    <div class="step-dot"></div>
+  </div>
+  <div class="section-label" id="exerciseScreenTitle">Übung wählen</div>
+
+  <button class="btn-back" onclick="backToType()">← Trainingsart wechseln</button>
+
+  <div id="exerciseButtons"></div>
+
+  <!-- Übung hinzufügen Formular (startet versteckt) -->
+  <div id="addExerciseForm" class="add-exercise-form" style="display:none;">
+    <label>Neue Übung</label>
+    <input type="text" id="newExerciseName" placeholder="z.B. Bulgarian Split Squats">
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="hideAddForm()">Abbrechen</button>
+      <button class="btn-primary" onclick="saveNewExercise()">Speichern →</button>
+    </div>
+  </div>
+
+  <div id="setInputSection" style="display:none; flex-direction:column; gap:14px;">
+    <div class="current-exercise-badge">
+      <div class="dot"></div>
+      <span id="currentExerciseName"></span>
+    </div>
+
+    <!-- Letzte Session wird hier per JS eingefügt -->
+    <div id="lastSessionBox"></div>
+
+    <div class="input-row">
+      <div class="input-group">
+        <label>Gewicht (kg)</label>
+        <input type="number" id="inputWeight" placeholder="80" min="0" step="0.5" inputmode="decimal">
+      </div>
+      <div class="input-group">
+        <label>Wiederholungen</label>
+        <input type="number" id="inputReps" placeholder="10" min="1" inputmode="numeric">
+      </div>
+    </div>
+
+    <div id="setsLog" style="display:none;">
+      <div class="sets-log">
+        <div class="sets-log-header">
+          <span>#</span>
+          <span style="text-align:center">KG</span>
+          <span style="text-align:center">WDH</span>
+          <span></span>
+        </div>
+        <div id="setsLogRows"></div>
+      </div>
+    </div>
+
+    <button class="btn-primary" onclick="addSet()">+ Satz hinzufügen</button>
+
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="changeExercise()">Übung wechseln</button>
+      <button class="btn-secondary" id="finishExBtn" onclick="finishExercise()" disabled>Übung fertig ✓</button>
+    </div>
+  </div>
+
+  <div id="noExerciseYet" style="padding: 8px 0;">
+    <button class="btn-secondary" onclick="goToSummary()" id="goSummaryBtn" style="display:none">
+      Training abschließen →
+    </button>
+    <button class="btn-secondary" id="editModeBtn" onclick="toggleEditMode()">
+      Übungen bearbeiten
+    </button>
+  </div>
+</div>
+
+
+<!-- SCREEN 3: Zusammenfassung -->
+<div class="screen" id="screen-summary">
+  <div class="steps">
+    <div class="step-dot done"></div>
+    <div class="step-dot done"></div>
+    <div class="step-dot done"></div>
+    <div class="step-dot active"></div>
+  </div>
+  <div class="section-label">Training<br><span>Zusammenfassung</span></div>
+
+  <div class="summary-block" id="summaryContent"></div>
+
+  <!-- Info dass alles bereits gespeichert ist -->
+  <div style="background:#1a2400;border:1px solid var(--accent);border-radius:var(--radius);padding:14px;font-size:0.85rem;color:var(--accent);display:flex;gap:10px;align-items:center;">
+    <span style="font-size:1.2rem">✓</span>
+    <span>Alle Sätze wurden bereits in Echtzeit gespeichert.</span>
+  </div>
+
+  <button class="btn-danger" onclick="resetAll()">Neues Training starten</button>
+</div>
+
+<!-- SCREEN 4: Auswertungen -->
+<div class="screen" id="screen-stats">
+  <div style="display:flex;justify-content:space-between;align-items:center;">
+    <div class="section-label"><span>Auswertung</span></div>
+    <button class="btn-back" onclick="showScreen('screen-type')">← Zurück</button>
+  </div>
+
+  <!-- Übung wählen -->
+  <div class="input-group">
+    <label>Übung</label>
+    <select class="exercise-select" id="statsExerciseSelect" onchange="loadStats()">
+      <option value="">– Übung wählen –</option>
+    </select>
+  </div>
+
+  <!-- Zeitraum wählen -->
+  <div class="period-tabs" id="periodTabs">
+    <button class="period-tab active" onclick="setPeriod(30, this)">4 Wo</button>
+    <button class="period-tab" onclick="setPeriod(90, this)">3 Mo</button>
+    <button class="period-tab" onclick="setPeriod(180, this)">6 Mo</button>
+    <button class="period-tab" onclick="setPeriod(9999, this)">Alles</button>
+  </div>
+
+  <!-- Persönliche Bestleistung -->
+  <div id="prBlock" style="display:none;">
+    <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Persönliche Bestleistungen</div>
+    <div class="pr-block">
+      <div class="pr-row">
+        <div>
+          <div class="pr-label">Höchstes Gewicht</div>
+          <div class="pr-date" id="prMaxWeightDate"></div>
+        </div>
+        <div style="text-align:right">
+          <div class="pr-value" id="prMaxWeight">–</div>
+        </div>
+      </div>
+      <div class="pr-row">
+        <div>
+          <div class="pr-label">Bestes Volumen (Session)</div>
+          <div class="pr-date" id="prMaxVolDate"></div>
+        </div>
+        <div style="text-align:right">
+          <div class="pr-value" id="prMaxVol">–</div>
+        </div>
+      </div>
+      <div class="pr-row">
+        <div>
+          <div class="pr-label">Trainingseinheiten</div>
+        </div>
+        <div style="text-align:right">
+          <div class="pr-value" id="prSessions">–</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Volumen Chart -->
+  <div id="chartBlock" style="display:none;">
+    <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Volumen über Zeit</div>
+    <div class="chart-container">
+      <canvas id="volumeChart"></canvas>
+      <div class="chart-placeholder" id="chartPlaceholder">Übung wählen</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+
+<script>
+  // ═══════════════════════════════════════════════════════
+  // SUPABASE KONFIGURATION
+  // ═══════════════════════════════════════════════════════
+  //
+  // SUPABASE_URL  = deine Projektadresse
+  // SUPABASE_KEY  = dein anon/public Key
+  //
+  // Diese beiden Werte sagen der App WO und WIE sie mit
+  // der Datenbank kommunizieren soll.
+  //
+  // !! HIER DEINE EIGENEN WERTE EINTRAGEN !!
+  const SUPABASE_URL = 'https://bbkxvrhmppgakqmydyms.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJia3h2cmhtcHBnYWtxbXlkeW1zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3MTAwMDEsImV4cCI6MjA5MDI4NjAwMX0.CkHonwg2m9e60STtDi-HuMrKVL4BLzRVNkxiXvYbyGc';
+
+  // Die Tabelle in die wir schreiben (muss in Supabase existieren)
+  const TABLE = 'training';
+
+  // ═══════════════════════════════════════════════════════
+  // SUPABASE HILFSFUNKTIONEN
+  // ═══════════════════════════════════════════════════════
+  //
+  // Supabase hat eine REST API – das bedeutet:
+  // Jede Aktion (lesen, schreiben) ist eine HTTP-Anfrage an eine URL.
+  //
+  // HTTP-Methoden:
+  //   GET    → Daten lesen  (wie Browser der eine Seite aufruft)
+  //   POST   → Daten senden (wie Formular abschicken)
+  //   DELETE → Daten löschen
+  //   PATCH  → Daten ändern
+  //
+  // fetch() ist die JavaScript-Funktion für HTTP-Anfragen.
+  // Sie gibt ein "Promise" zurück – ein Versprechen dass die Antwort
+  // irgendwann kommt. Mit "await" warten wir darauf.
+
+  // Standardheader die jede Anfrage braucht:
+  // - apikey: beweist wer wir sind
+  // - Authorization: gleicher Key nochmal (Supabase-Konvention)
+  // - Content-Type: sagt dem Server "ich schicke JSON"
+  // - Prefer: return=minimal → Server soll nicht die ganze Zeile zurückschicken
+  const headers = {
+    'apikey':        SUPABASE_KEY,
+    'Authorization': `Bearer ${SUPABASE_KEY}`,
+    'Content-Type':  'application/json',
+    'Prefer':        'return=minimal'
+  };
+
+  // ── Einen Satz in Supabase speichern ──────────────────
+  // "async" = diese Funktion ist asynchron (wartet auf Antworten)
+  async function saveSatz(satzData) {
+    // fetch() sendet HTTP POST an Supabase
+    // URL-Aufbau: SUPABASE_URL + /rest/v1/ + Tabellenname
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}`, {
+      method:  'POST',
+      headers: headers,
+      body:    JSON.stringify(satzData)  // Objekt → JSON-String
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  }
+
+  // ── Letztes Gewicht pro Übung laden ───────────────────
+  // Supabase REST API unterstützt Filter direkt in der URL:
+  // ?select=spalten&filter=wert&order=spalte.desc&limit=1
+  // Lädt alle Sätze der letzten Session für eine Übung
+  // Schritt 1: neuestes Datum für diese Übung + Nutzer finden
+  // Schritt 2: alle Sätze dieses Datums laden
+  async function loadLastSession(uebungName) {
+    // Schritt 1: letztes Datum finden
+    const urlDatum = `${SUPABASE_URL}/rest/v1/${TABLE}`
+      + `?select=datum`
+      + `&uebung=eq.${encodeURIComponent(uebungName)}`
+      + `&order=datum.desc`
+      + `&limit=1`;
+
+    const resDatum = await fetch(urlDatum, { headers });
+    if (!resDatum.ok) return null;
+    const datumData = await resDatum.json();
+    if (!datumData[0]) return null;
+
+    const letztesDatum = datumData[0].datum;
+
+    // Schritt 2: alle Sätze dieses Datums laden, sortiert nach Satznummer
+    const urlSaetze = `${SUPABASE_URL}/rest/v1/${TABLE}`
+      + `?select=satz,gewicht_kg,wiederholungen`
+      + `&uebung=eq.${encodeURIComponent(uebungName)}`
+      + `&datum=eq.${letztesDatum}`
+      + `&order=satz.asc`;
+
+    const resSaetze = await fetch(urlSaetze, { headers });
+    if (!resSaetze.ok) return null;
+    const saetze = await resSaetze.json();
+
+    return { datum: letztesDatum, saetze };
+  }
+
+  // Zeigt die letzte Session als Box an
+  function renderLastSession(sessionData) {
+    const box = document.getElementById('lastSessionBox');
+    if (!sessionData || !sessionData.saetze.length) {
+      box.innerHTML = '';
+      return;
+    }
+
+    // Datum formatieren: 2026-03-28 → 28.03.2026
+    const [j, m, t] = sessionData.datum.split('-');
+    const datumDE = `${t}.${m}.${j}`;
+
+    // Zeilen für jeden Satz bauen
+    const zeilen = sessionData.saetze.map(s => `
+      <div class="last-session-row">
+        <span class="last-session-num">Satz ${s.satz}</span>
+        <span class="last-session-val">${s.gewicht_kg} kg</span>
+        <span class="last-session-val">${s.wiederholungen} ×</span>
+      </div>
+    `).join('');
+
+    box.innerHTML = `
+      <div class="last-session">
+        <div class="last-session-header">
+          <span>Letztes Training</span>
+          <span class="ex-date">${datumDE}</span>
+        </div>
+        ${zeilen}
+      </div>
+    `;
+  }
+
+  // Kompatibilitätsfunktion – wird von preloadLastWeights gebraucht
+  // Wir laden jetzt keine Gewichte vor, sondern erst bei Übungsauswahl
+  async function loadLastWeight(uebungName) {
+    return null;
+  }
+
+  // ── Verbindung testen ─────────────────────────────────
+  async function testConnection() {
+    try {
+      // Einfach eine Zeile abrufen – wenn es klappt, ist die Verbindung ok
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/${TABLE}?limit=1`,
+        { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+      );
+      if (res.ok) {
+        setConnectionStatus('ok');
+      } else {
+        setConnectionStatus('err');
+      }
+    } catch {
+      setConnectionStatus('err');
+    }
+  }
+
+  function setConnectionStatus(status) {
+    const badge = document.getElementById('connBadge');
+    const text  = document.getElementById('connText');
+    badge.className = 'connection-badge ' + status;
+    text.textContent = status === 'ok' ? 'Supabase ✓' : 'Keine Verbindung';
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // APP DATEN & STATE
+  // ═══════════════════════════════════════════════════════
+
+  // Kein hardcoded EXERCISES mehr – alles kommt aus Supabase
+  // state.allExercises wird nach Login pro Trainingsart befüllt
+
+  let lastWeights = {};
+
+  let state = {
+    nutzer: null,
+    token:  null,          // JWT Token von Supabase Auth
+    type: null,
+    currentExercise: null,
+    currentSets: [],
+    completedExercises: [],
+    customExercises: [],
+    allExercises: {}
+  };
+
+  // Heutiges Datum als ISO-String (2026-03-27) für die Datenbank
+  // und als lesbaren String für die Anzeige
+  const today        = new Date();
+  const todayISO     = today.toISOString().split('T')[0]; // "2026-03-27"
+  const todayDisplay = today.toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'short' });
+
+  // ═══════════════════════════════════════════════════════
+  // INITIALISIERUNG
+  // ═══════════════════════════════════════════════════════
+
+  document.getElementById('dateBadge').textContent = todayDisplay;
+
+  // Beim Start: prüfen ob noch eine Session aktiv ist (auto-login)
+  checkExistingSession();
+
+  // Letzte Gewichte für alle Übungen vorladen
+  // (damit sie sofort da sind wenn der Nutzer eine Übung wählt)
+  // Letzte Gewichte werden nicht mehr vorgeladen
+  // Stattdessen: letzte Session wird bei Übungsauswahl geladen (loadLastSession)
+  async function preloadLastWeights() { /* nicht mehr benötigt */ }
+
+  // ═══════════════════════════════════════════════════════
+  // SCREEN-NAVIGATION
+  // ═══════════════════════════════════════════════════════
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // SUPABASE AUTH
+  // ═══════════════════════════════════════════════════════
+
+  // Supabase Client initialisieren (nutzt die JS SDK)
+  // Dieser Client kümmert sich um Login, Session, Token – alles automatisch
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  // Login mit E-Mail + Passwort
+  async function loginWithEmail() {
+    const email    = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+
+    if (!email || !password) {
+      showToast('Bitte E-Mail und Passwort eingeben', 'error');
+      return;
+    }
+
+    // Feedback während Login läuft
+    const btn = document.querySelector('#screen-user .btn-primary');
+    btn.textContent = 'Anmelden...';
+    btn.disabled    = true;
+    document.getElementById('loginError').style.display = 'none';
+
+    // Supabase Auth Login
+    // signInWithPassword gibt { data, error } zurück
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      // Fehler → Shake + Meldung
+      btn.textContent = 'Anmelden →';
+      btn.disabled    = false;
+      document.getElementById('loginError').style.display = 'block';
+      document.getElementById('loginPassword').value = '';
+      document.getElementById('loginPassword').classList.add('shake');
+      setTimeout(() => document.getElementById('loginPassword').classList.remove('shake'), 400);
+      return;
+    }
+
+    // Erfolgreich → Nutzername aus E-Mail ableiten
+    // colin@training.app → "Colin"
+    const emailName = email.split('@')[0];
+    const name = emailName.charAt(0).toUpperCase() + emailName.slice(1);
+
+    await loginUser(name, data.session.access_token);
+  }
+
+  // Nutzer einloggen: Token setzen, Übungen laden, zur Trainingsart
+  async function loginUser(name, token) {
+    state.nutzer = name;
+    state.token  = token;
+
+    // Header mit Auth Token aktualisieren
+    // Ab jetzt trägt jede Anfrage den JWT Token → RLS greift korrekt
+    headers['Authorization'] = `Bearer ${token}`;
+
+    document.getElementById('connText').textContent = name + ' · ✓';
+    document.getElementById('connBadge').className = 'connection-badge ok';
+
+    // Übungen laden
+    await loadAllExercises();
+
+    // Übungsanzahl auf Karten setzen
+    ['Beine', 'Brust', 'Rücken'].forEach(art => {
+      const anzahl = (state.allExercises[art] || []).length;
+      const el = document.getElementById('count-' + art);
+      if (el) el.textContent = anzahl + ' Übungen';
+    });
+
+    showStatsButton();
+    showScreen('screen-type');
+  }
+
+  // Ausloggen
+  async function logoutUser() {
+    await supabase.auth.signOut();
+    resetAll();
+  }
+
+  // Beim Laden der Seite: prüfen ob noch eine Session aktiv ist
+  // Wenn ja → direkt einloggen ohne Login-Screen
+  async function checkExistingSession() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      const emailName = session.user.email.split('@')[0];
+      const name = emailName.charAt(0).toUpperCase() + emailName.slice(1);
+      await loginUser(name, session.access_token);
+    } else {
+      setConnectionStatus('ok');
+    }
+  }
+
+  // Alle Übungen aus Supabase laden
+  // RLS filtert automatisch nach eingeloggtem User – kein nutzer-Filter nötig
+  async function loadAllExercises() {
+    const url = `${SUPABASE_URL}/rest/v1/uebungen`
+      + `?select=name,trainingsart`
+      + `&order=created_at.asc`;
+
+    const res  = await fetch(url, { headers });
+    const data = await res.json();
+
+    state.allExercises = {};
+    data.forEach(row => {
+      if (!state.allExercises[row.trainingsart]) {
+        state.allExercises[row.trainingsart] = [];
+      }
+      state.allExercises[row.trainingsart].push(row.name);
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // TRAININGSART WÄHLEN
+  // ═══════════════════════════════════════════════════════
+
+  async function selectType(type) {
+    state.type = type;
+    state.currentExercise = null;
+    state.currentSets = [];
+    state.completedExercises = [];
+
+    document.getElementById('exerciseScreenTitle').innerHTML =
+      `<span>${type}</span> –<br>Übung wählen`;
+
+    // Eigene Übungen für diese Trainingsart laden
+    await loadCustomExercises();
+
+    renderExerciseButtons();
+    document.getElementById('setInputSection').style.display = 'none';
+    document.getElementById('goSummaryBtn').style.display = 'none';
+    document.getElementById('addExerciseForm').style.display = 'none';
+    showScreen('screen-exercise');
+  }
+
+  // Zurück zur Trainingsartauswahl (ohne completedExercises zu löschen
+  // falls jemand Ganzkörper macht und Trainingsart wechseln will)
+  function backToType() {
+    state.currentExercise = null;
+    state.currentSets = [];
+    document.getElementById('setInputSection').style.display = 'none';
+    document.getElementById('addExerciseForm').style.display = 'none';
+    showScreen('screen-type');
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // ÜBUNGS-BUTTONS RENDERN
+  // ═══════════════════════════════════════════════════════
+  //
+  // NEU: Unter jedem Button wird das letzte Gewicht angezeigt
+  // falls vorhanden ("Zuletzt: 80 kg × 8")
+
+  function renderExerciseButtons() {
+    const standardUebungen = [];
+    const container  = document.getElementById('exerciseButtons');
+    // Übungen kommen jetzt komplett aus Supabase (state.allExercises)
+    const exercises  = state.allExercises[state.type] || [];
+    const doneNames  = state.completedExercises.map(e => e.name);
+    container.innerHTML = '';
+
+    exercises.forEach(ex => {
+      const wrapper = document.createElement('div');
+      wrapper.style.marginBottom = '8px';
+
+      const btn = document.createElement('button');
+      btn.className = 'exercise-btn' + (doneNames.includes(ex) ? ' selected' : '');
+
+      if (editMode && !standardUebungen.includes(ex)) {
+        // Edit-Modus: Löschen-Button zeigen
+        btn.style.display        = 'flex';
+        btn.style.justifyContent = 'space-between';
+        btn.style.alignItems     = 'center';
+        btn.innerHTML = `
+          <span>${ex}</span>
+          <span onclick="event.stopPropagation(); deleteExercise('${ex}')"
+                style="color:var(--accent2);font-size:1.1rem;padding:2px 6px;">✕</span>
+        `;
+      } else if (doneNames.includes(ex)) {
+        // Übung bereits abgeschlossen
+        btn.innerHTML = `✓ ${ex} <span style="color:var(--muted);font-size:0.8rem">(${state.completedExercises.find(e=>e.name===ex).sets.length} Sätze)</span>`;
+      } else {
+        // Normal: Übung wählbar
+        btn.innerHTML = ex;
+        btn.onclick   = () => selectExercise(ex);
+      }
+      
+      wrapper.appendChild(btn);
+      container.appendChild(wrapper);
+    });
+
+    // "+ Übung hinzufügen" Button immer am Ende
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn-secondary';
+    addBtn.style.marginTop = '4px';
+    addBtn.style.borderStyle = 'dashed';
+    addBtn.textContent = '+ Übung hinzufügen';
+    addBtn.onclick = showAddForm;
+    container.appendChild(addBtn);
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // EIGENE ÜBUNGEN
+  // ═══════════════════════════════════════════════════════
+
+  // Übungen nach Hinzufügen neu laden (nur aktuelle Trainingsart)
+  async function loadCustomExercises() {
+    await loadAllExercises();
+  }
+
+  // Formular einblenden
+  function showAddForm() {
+    document.getElementById('addExerciseForm').style.display = 'flex';
+    document.getElementById('newExerciseName').value = '';
+    document.getElementById('newExerciseName').focus();
+    // Zum Formular scrollen
+    setTimeout(() => {
+      document.getElementById('addExerciseForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  }
+
+  // Formular ausblenden
+  function hideAddForm() {
+    document.getElementById('addExerciseForm').style.display = 'none';
+    document.getElementById('newExerciseName').value = '';
+  }
+
+  // ── EDIT MODUS ──────────────────────────────────────────
+
+  // Speichert ob Edit-Modus aktiv ist
+  let editMode = false;
+
+  function toggleEditMode() {
+    // Umschalten: war false → wird true, war true → wird false
+    editMode = !editMode;
+
+    // Button-Text je nach Zustand ändern
+    const btn = document.getElementById('editModeBtn');
+    btn.textContent = editMode ? 'Fertig ✓' : 'Übungen bearbeiten';
+    btn.style.borderColor = editMode ? 'var(--accent)' : '';
+    btn.style.color       = editMode ? 'var(--accent)' : '';
+
+    // Buttons neu rendern – jetzt mit oder ohne ✕
+    renderExerciseButtons();
+  }
+
+  // Übung löschen
+  async function deleteExercise(name) {
+    // Sicherheitsabfrage – window.confirm öffnet einen Browser-Dialog
+    // "Bist du sicher?" → OK = true, Abbrechen = false
+    const bestaetigt = window.confirm(`"${name}" wirklich löschen?`);
+    if (!bestaetigt) return;
+
+    try {
+      // DELETE Request an Supabase
+      // Filtert nach Name UND Nutzer – nur diese eine Übung wird gelöscht
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/uebungen`
+        + `?name=eq.${encodeURIComponent(name)}`,
+        { method: 'DELETE', headers }
+      );
+
+      if (!res.ok) throw new Error();
+
+      // Lokal aus state.allExercises entfernen
+      // filter() gibt ein neues Array zurück ohne das gelöschte Element
+      state.allExercises[state.type] = state.allExercises[state.type]
+        .filter(ex => ex !== name);
+
+      // Anzahl auf Trainingsart-Karte aktualisieren
+      const anzahl = state.allExercises[state.type].length;
+      const countEl = document.getElementById('count-' + state.type);
+      if (countEl) countEl.textContent = anzahl + ' Übungen';
+
+      renderExerciseButtons();
+      showToast(`"${name}" gelöscht`, 'success');
+
+    } catch {
+      showToast('Fehler beim Löschen', 'error');
+    }
+  }
+  
+  // Neue Übung in Supabase speichern
+  async function saveNewExercise() {
+    const name = document.getElementById('newExerciseName').value.trim();
+    if (!name) { showToast('Bitte einen Namen eingeben', 'error'); return; }
+
+    // Doppelte verhindern
+    const alle = state.allExercises[state.type] || [];
+    if (alle.includes(name)) { showToast('Übung existiert bereits', 'error'); return; }
+
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/uebungen`, {
+        method: 'POST',
+        headers,
+        body:   JSON.stringify({
+          name:         name,
+          trainingsart: state.type,
+          nutzer:       state.nutzer  // für Anzeige/Filter
+        })
+      });
+
+      if (!res.ok) throw new Error();
+
+      // Übungen neu laden und Buttons aktualisieren
+      await loadAllExercises();
+      hideAddForm();
+      renderExerciseButtons();
+      showToast(`✓ "${name}" hinzugefügt`, 'success');
+
+    } catch {
+      showToast('Fehler beim Speichern', 'error');
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // ÜBUNG WÄHLEN
+  // ═══════════════════════════════════════════════════════
+
+  async function selectExercise(name) {
+    state.currentExercise = name;
+    state.currentSets = [];
+
+    document.getElementById('currentExerciseName').textContent = name;
+    document.getElementById('setInputSection').style.display = 'flex';
+    document.getElementById('setsLog').style.display = 'none';
+    document.getElementById('setsLogRows').innerHTML = '';
+    document.getElementById('finishExBtn').disabled = true;
+
+    // Felder leer lassen – Nutzer entscheidet selbst
+    document.getElementById('inputWeight').value = '';
+    document.getElementById('inputReps').value   = '';
+
+    // Letzte Session laden
+    const box = document.getElementById('lastSessionBox');
+    box.innerHTML = '<div style="font-size:0.78rem;color:var(--muted);padding:4px 0">⏳ Lade letztes Training...</div>';
+    const session = await loadLastSession(name);
+    renderLastSession(session);
+
+    renderExerciseButtons();
+
+    setTimeout(() => {
+      document.getElementById('setInputSection').scrollIntoView({ behavior:'smooth', block:'start' });
+    }, 100);
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // SATZ HINZUFÜGEN
+  // ═══════════════════════════════════════════════════════
+  //
+  // NEU: Jeder Satz wird SOFORT an Supabase gesendet.
+  // Der Nutzer sieht in der Satz-Liste einen kleinen Status:
+  // ⏳ Speichern... → ✓ (gespeichert) oder ✕ (Fehler)
+
+  async function addSet() {
+    const weight = document.getElementById('inputWeight').value;
+    const reps   = document.getElementById('inputReps').value;
+
+    if (!weight || !reps) {
+      showToast('Gewicht und Wiederholungen eingeben', 'error');
+      return;
+    }
+
+    const satzNummer = state.currentSets.length + 1;
+
+    // Satz zum lokalen state hinzufügen
+    const satz = {
+      weight:  parseFloat(weight),
+      reps:    parseInt(reps),
+      status:  'saving',  // Status für UI: saving | saved | error
+      dbId:    null       // ID die Supabase zurückgibt (für späteres Löschen)
+    };
+    state.currentSets.push(satz);
+
+    renderSetsLog();
+    document.getElementById('finishExBtn').disabled = false;
+
+    // Wiederholungsfeld leeren, Fokus setzen
+    document.getElementById('inputReps').value = '';
+    document.getElementById('inputReps').focus();
+
+    // Daten-Objekt für Supabase zusammenbauen
+    // Spaltennamen müssen EXAKT mit der Tabelle übereinstimmen
+    const satzData = {
+      datum:          todayISO,
+      uhrzeit:        new Date().toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' }),
+      trainingsart:   state.type,
+      uebung:         state.currentExercise,
+      satz:           satzNummer,
+      gewicht_kg:     parseFloat(weight),
+      wiederholungen: parseInt(reps),
+      nutzer:         state.nutzer  // bleibt für Anzeige/Filter
+    };
+
+    // Satz an Supabase senden (im Hintergrund)
+    try {
+      await saveSatz(satzData);
+      satz.status = 'saved';
+
+      // lastWeights aktualisieren damit nächste Übung aktuell ist
+      lastWeights[state.currentExercise] = {
+        gewicht_kg:     parseFloat(weight),
+        wiederholungen: parseInt(reps)
+      };
+
+    } catch (err) {
+      console.error('Speichern fehlgeschlagen:', err);
+      satz.status = 'error';
+      showToast('⚠ Satz nicht gespeichert – Verbindung prüfen', 'error');
+    }
+
+    // Liste neu rendern um Status-Icon zu aktualisieren
+    renderSetsLog();
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // SATZ-LISTE RENDERN
+  // ═══════════════════════════════════════════════════════
+  //
+  // NEU: Kleines Status-Icon pro Satz (⏳ / ✓ / ✕)
+
+  function renderSetsLog() {
+    const rows = document.getElementById('setsLogRows');
+    rows.innerHTML = '';
+
+    state.currentSets.forEach((s, i) => {
+      const row = document.createElement('div');
+      row.className = 'set-row';
+
+      // Status-Icon je nach Speicherstatus
+      const statusIcon = s.status === 'saving' ? '⏳'
+                       : s.status === 'saved'  ? '✓'
+                       : '✕';
+      const statusClass = s.status === 'saving' ? 'saving'
+                        : s.status === 'saved'  ? 'saved'
+                        : 'error';
+
+      row.innerHTML = `
+        <span class="set-num">${i + 1}</span>
+        <span class="set-val">${s.weight} kg</span>
+        <span class="set-val">${s.reps} ×</span>
+        <span class="set-sync ${statusClass}">${statusIcon}</span>
+      `;
+      rows.appendChild(row);
+    });
+
+    document.getElementById('setsLog').style.display =
+      state.currentSets.length > 0 ? 'block' : 'none';
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // ÜBUNG ABSCHLIESSEN
+  // ═══════════════════════════════════════════════════════
+
+  function finishExercise() {
+    if (state.currentSets.length === 0) return;
+
+    state.completedExercises.push({
+      name: state.currentExercise,
+      sets: [...state.currentSets]
+    });
+
+    state.currentExercise = null;
+    state.currentSets = [];
+
+    document.getElementById('setInputSection').style.display = 'none';
+    document.getElementById('goSummaryBtn').style.display = 'block';
+
+    renderExerciseButtons();
+
+    const lastEx = state.completedExercises[state.completedExercises.length - 1];
+    showToast(`✓ ${lastEx.name} abgeschlossen`, 'success');
+  }
+
+  function changeExercise() {
+    state.currentExercise = null;
+    state.currentSets = [];
+    document.getElementById('setInputSection').style.display = 'none';
+    renderExerciseButtons();
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // ZUSAMMENFASSUNG
+  // ═══════════════════════════════════════════════════════
+
+  function goToSummary() {
+    if (state.completedExercises.length === 0) {
+      showToast('Noch keine Übungen abgeschlossen', 'error');
+      return;
+    }
+    renderSummary();
+    showScreen('screen-summary');
+  }
+
+  function renderSummary() {
+    const el = document.getElementById('summaryContent');
+    el.innerHTML = `
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:0.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Trainingsart</span>
+        <span style="font-weight:700;color:var(--accent)">${state.type}</span>
+      </div>
+      <div style="height:1px;background:var(--border);margin-bottom:10px"></div>
+    `;
+
+    state.completedExercises.forEach(ex => {
+      const div = document.createElement('div');
+      div.className = 'summary-exercise';
+      const setsText = ex.sets.map((s, i) =>
+        `Satz ${i+1}: ${s.weight}kg × ${s.reps}`
+      ).join(' · ');
+      div.innerHTML = `
+        <div>
+          <div class="summary-ex-name">${ex.name}</div>
+          <div class="summary-ex-sets">${setsText}</div>
+        </div>
+        <div class="summary-count">${ex.sets.length}×</div>
+      `;
+      el.appendChild(div);
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // RESET
+  // ═══════════════════════════════════════════════════════
+
+  function resetAll() {
+    state = { nutzer: null, token: null, type: null, currentExercise: null, currentSets: [], completedExercises: [], customExercises: [], allExercises: {} };
+    lastWeights = {};
+    // Auth Header zurücksetzen
+    headers['Authorization'] = `Bearer ${SUPABASE_KEY}`;
+    // Login-Felder leeren
+    document.getElementById('loginEmail').value    = '';
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('loginError').style.display = 'none';
+    document.getElementById('connText').textContent = 'Anmelden';
+    document.getElementById('connBadge').className  = 'connection-badge';
+    document.getElementById('statsBtn').style.display = 'none';
+    showScreen('screen-user');
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // TOAST (Benachrichtigung)
+  // ═══════════════════════════════════════════════════════
+
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className   = 'toast show ' + type;
+    setTimeout(() => t.className = 'toast', 2800);
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // TASTATUR-SHORTCUTS
+  // ═══════════════════════════════════════════════════════
+
+  document.getElementById('inputReps').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addSet();
+  });
+  document.getElementById('inputWeight').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('inputReps').focus();
+  });
+  document.getElementById('loginPassword').addEventListener('keydown', e => {
+    if (e.key === 'Enter') loginWithEmail();
+  });
+  document.getElementById('loginEmail').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('loginPassword').focus();
+  });
+
+  // ═══════════════════════════════════════════════════════
+  // AUSWERTUNGEN & STATISTIKEN
+  // ═══════════════════════════════════════════════════════
+
+  let statsPeriodDays = 30;
+  let volumeChartInstance = null;
+
+  function showStats() {
+    const select = document.getElementById('statsExerciseSelect');
+    select.innerHTML = '<option value="">– Übung wählen –</option>';
+    Object.values(state.allExercises).flat().forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      select.appendChild(opt);
+    });
+    showScreen('screen-stats');
+  }
+
+  function setPeriod(days, btn) {
+    statsPeriodDays = days;
+    document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    if (document.getElementById('statsExerciseSelect').value) loadStats();
+  }
+
+  async function loadStats() {
+    const uebung = document.getElementById('statsExerciseSelect').value;
+    if (!uebung) return;
+
+    const vonDatum = statsPeriodDays === 9999
+      ? '2000-01-01'
+      : new Date(Date.now() - statsPeriodDays * 86400000).toISOString().split('T')[0];
+
+    const url = `${SUPABASE_URL}/rest/v1/${TABLE}`
+      + `?select=datum,gewicht_kg,wiederholungen,satz`
+      + `&uebung=eq.${encodeURIComponent(uebung)}`
+      + `&datum=gte.${vonDatum}`
+      + `&order=datum.asc,satz.asc`;
+
+    const res   = await fetch(url, { headers });
+    const daten = await res.json();
+
+    if (!daten.length) {
+      document.getElementById('prBlock').style.display    = 'none';
+      document.getElementById('chartBlock').style.display = 'none';
+      document.getElementById('chartPlaceholder').textContent  = 'Keine Daten im gewählten Zeitraum';
+      document.getElementById('chartPlaceholder').style.display = 'flex';
+      return;
+    }
+
+    renderPR(daten);
+    renderVolumeChart(daten);
+  }
+
+  function renderPR(daten) {
+    const maxGewicht = daten.reduce((max, d) => d.gewicht_kg > max.gewicht_kg ? d : max, daten[0]);
+
+    const volProTag = {};
+    daten.forEach(d => {
+      volProTag[d.datum] = (volProTag[d.datum] || 0) + d.gewicht_kg * d.wiederholungen;
+    });
+
+    const besteDatum = Object.entries(volProTag).reduce((max, [d, v]) => v > max[1] ? [d, v] : max, ['', 0]);
+    const sessions   = Object.keys(volProTag).length;
+
+    const fmtDate = iso => { const [j,m,t] = iso.split('-'); return `${t}.${m}.${j}`; };
+
+    document.getElementById('prMaxWeight').textContent     = `${maxGewicht.gewicht_kg} kg`;
+    document.getElementById('prMaxWeightDate').textContent  = fmtDate(maxGewicht.datum);
+    document.getElementById('prMaxVol').textContent         = `${Math.round(besteDatum[1])} kg`;
+    document.getElementById('prMaxVolDate').textContent     = fmtDate(besteDatum[0]);
+    document.getElementById('prSessions').textContent       = sessions;
+    document.getElementById('prBlock').style.display        = 'block';
+  }
+
+  function renderVolumeChart(daten) {
+    const volProTag = {};
+    daten.forEach(d => {
+      volProTag[d.datum] = (volProTag[d.datum] || 0) + d.gewicht_kg * d.wiederholungen;
+    });
+
+    const labels = Object.keys(volProTag).map(iso => { const [j,m,t] = iso.split('-'); return `${t}.${m}`; });
+    const values = Object.values(volProTag).map(v => Math.round(v));
+
+    if (volumeChartInstance) { volumeChartInstance.destroy(); volumeChartInstance = null; }
+
+    document.getElementById('chartPlaceholder').style.display = 'none';
+    document.getElementById('chartBlock').style.display        = 'block';
+
+    const ctx = document.getElementById('volumeChart').getContext('2d');
+    volumeChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Volumen (kg)',
+          data: values,
+          borderColor: '#e8ff47',
+          backgroundColor: 'rgba(232,255,71,0.08)',
+          borderWidth: 2,
+          pointBackgroundColor: '#e8ff47',
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: true,
+          tension: 0.3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#888', font: { size: 10 }, maxRotation: 45, maxTicksLimit: 8 }, grid: { color: '#2e2e2e' } },
+          y: { ticks: { color: '#888', font: { size: 10 } }, grid: { color: '#2e2e2e' } }
+        }
+      }
+    });
+  }
+
+  function showStatsButton() {
+    document.getElementById('statsBtn').style.display = 'block';
+  }
+
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</body>
+</html>
