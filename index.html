@@ -769,8 +769,8 @@
 
   // Supabase Client initialisieren (nutzt die JS SDK)
   // Dieser Client kümmert sich um Login, Session, Token – alles automatisch
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  
   // Login mit E-Mail + Passwort
   async function loginWithEmail() {
     const email    = document.getElementById('loginEmail').value.trim();
@@ -789,7 +789,7 @@
 
     // Supabase Auth Login
     // signInWithPassword gibt { data, error } zurück
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
 
     if (error) {
       // Fehler → Shake + Meldung
@@ -838,14 +838,14 @@
 
   // Ausloggen
   async function logoutUser() {
-    await supabase.auth.signOut();
+    await supabaseClient.auth.signOut();
     resetAll();
   }
 
   // Beim Laden der Seite: prüfen ob noch eine Session aktiv ist
   // Wenn ja → direkt einloggen ohne Login-Screen
   async function checkExistingSession() {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await supabaseClient.auth.getSession();
     if (session) {
       const emailName = session.user.email.split('@')[0];
       const name = emailName.charAt(0).toUpperCase() + emailName.slice(1);
