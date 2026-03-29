@@ -384,6 +384,10 @@
       <div class="name">Rücken</div>
       <div class="sub" id="count-Rücken">Lädt...</div>
     </div>
+    <div class="type-card" onclick="selectType('Cardio')">
+      <div class="icon">🏅</div>
+      <div class="name">Cardio</div>
+      <div class="sub" id="count-Cardio">Lädt...</div>
   </div>
 </div>
 
@@ -826,7 +830,7 @@
     await loadAllExercises();
 
     // Übungsanzahl auf Karten setzen
-    ['Beine', 'Brust', 'Rücken'].forEach(art => {
+    ['Beine', 'Brust', 'Rücken', 'Cardio'].forEach(art => {
       const anzahl = (state.allExercises[art] || []).length;
       const el = document.getElementById('count-' + art);
       if (el) el.textContent = anzahl + ' Übungen';
