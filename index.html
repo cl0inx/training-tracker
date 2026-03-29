@@ -678,7 +678,7 @@
 
     // Schritt 2: alle Sätze dieses Datums laden, sortiert nach Satznummer
     const urlSaetze = `${SUPABASE_URL}/rest/v1/${TABLE}`
-      + `?select=satz,gewicht_kg,wiederholungen`
+      + `?select=satz,gewicht_kg,wiederholungen,zeit_minuten,runden`
       + `&uebung=eq.${encodeURIComponent(uebungName)}`
       + `&datum=eq.${letztesDatum}`
       + `&order=satz.asc`;
@@ -703,14 +703,19 @@
     const datumDE = `${t}.${m}.${j}`;
 
     // Zeilen für jeden Satz bauen
-    const zeilen = sessionData.saetze.map(s => `
-      <div class="last-session-row">
-        <span class="last-session-num">Satz ${s.satz}</span>
-        <span class="last-session-val">${s.gewicht_kg} kg</span>
-        <span class="last-session-val">${s.wiederholungen} ×</span>
-      </div>
-    `).join('');
-
+    const zeilen = sessionData.saetze.map(s => {
+      const isCardio = state.type === 'Cardio';
+      const col1 = isCardio ? `${s.zeit_minuten} min` : `${s.gewicht_kg} kg`;
+      const col2 = isCardio ? `${s.runden} ×`         : `${s.wiederholungen} ×`;
+      return `
+        <div class="last-session-row">
+          <span class="last-session-num">Satz ${s.satz}</span>
+          <span class="last-session-val">${col1}</span>
+          <span class="last-session-val">${col2}</span>
+        </div>
+      `;
+    }).join('');
+    
     box.innerHTML = `
       <div class="last-session">
         <div class="last-session-header">
