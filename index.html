@@ -566,12 +566,12 @@
           <div class="pr-value" id="prSessions">–</div>
         </div>
       </div>
-      <div class="pr-row">
+      <div class="pr-row" id="prMaxRunden" style="display:none;">
         <div>
           <div class="pr-label">Meiste Runden</div>
         </div>
         <div style="text-align:right">
-          <div class="pr-value" id="prMaxRunden">–</div>
+          <div class="pr-value" id="prMaxRundenWert">–</div>
         </div>
       </div>
     </div>
@@ -1510,10 +1510,10 @@
   document.getElementById('prMaxWeightDate').textContent = 'Beste Pace';
   document.getElementById('prMaxVol').textContent        = `${laengste} min`;
   document.getElementById('prMaxVolDate').textContent    = 'Längste Einheit';
-  document.getElementById('prMaxRunden').textContent     = `${meiste} ×`;
+  document.getElementById('prMaxRundenWert').textContent = `${meiste} ×`;
+  document.getElementById('prMaxRunden').style.display   = 'flex';
   document.getElementById('prSessions').textContent      = sessions;
   document.getElementById('prBlock').style.display       = 'block';
-  document.getElementById('prMaxRunden').style.display   = 'flex';  
 }
 
   function renderCardioChart(daten) {
