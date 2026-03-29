@@ -385,9 +385,10 @@
       <div class="sub" id="count-Rücken">Lädt...</div>
     </div>
     <div class="type-card" onclick="selectType('Cardio')">
-      <div class="icon">🏅</div>
+      <div class="icon">🏃</div>
       <div class="name">Cardio</div>
       <div class="sub" id="count-Cardio">Lädt...</div>
+    </div>
   </div>
 </div>
 
@@ -422,23 +423,47 @@
       <span id="currentExerciseName"></span>
     </div>
 
+    <!-- Datum-Feld: vorausgefüllt mit heute, aber änderbar -->
+    <div class="input-group">
+      <label>Datum</label>
+      <input type="date" id="inputDatum"
+             style="font-size:1rem;text-align:left;padding:14px;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;color:var(--text);width:100%;outline:none;">
+    </div>
+
     <!-- Letzte Session wird hier per JS eingefügt -->
     <div id="lastSessionBox"></div>
 
-    <div class="input-row">
-      <div class="input-group">
-        <label>Gewicht (kg)</label>
-        <input type="number" id="inputWeight" placeholder="80" min="0" step="0.5" inputmode="decimal">
+    <!-- Kraft-Eingabe (standard) -->
+    <div id="kraftInputs">
+      <div class="input-row">
+        <div class="input-group">
+          <label>Gewicht (kg)</label>
+          <input type="number" id="inputWeight" placeholder="80" min="0" step="0.5" inputmode="decimal">
+        </div>
+        <div class="input-group">
+          <label>Wiederholungen</label>
+          <input type="number" id="inputReps" placeholder="10" min="1" inputmode="numeric">
+        </div>
       </div>
-      <div class="input-group">
-        <label>Wiederholungen</label>
-        <input type="number" id="inputReps" placeholder="10" min="1" inputmode="numeric">
+    </div>
+
+    <!-- Cardio-Eingabe (nur bei Cardio sichtbar) -->
+    <div id="cardioInputs" style="display:none;">
+      <div class="input-row">
+        <div class="input-group">
+          <label>Zeit (Minuten)</label>
+          <input type="number" id="inputZeit" placeholder="30" min="0" step="0.5" inputmode="decimal">
+        </div>
+        <div class="input-group">
+          <label>Runden</label>
+          <input type="number" id="inputRunden" placeholder="1" min="1" inputmode="numeric">
+        </div>
       </div>
     </div>
 
     <div id="setsLog" style="display:none;">
       <div class="sets-log">
-        <div class="sets-log-header">
+        <div class="sets-log-header" id="setsLogHeader">
           <span>#</span>
           <span style="text-align:center">KG</span>
           <span style="text-align:center">WDH</span>
@@ -1094,9 +1119,24 @@
     document.getElementById('setsLogRows').innerHTML = '';
     document.getElementById('finishExBtn').disabled = true;
 
-    // Felder leer lassen – Nutzer entscheidet selbst
+    // Datum auf heute setzen (im ISO-Format für input type=date)
+    document.getElementById('inputDatum').value = todayISO;
+
+    // Cardio oder Kraft? Inputs entsprechend ein/ausblenden
+    const isCardio = state.type === 'Cardio';
+    document.getElementById('kraftInputs').style.display  = isCardio ? 'none' : 'block';
+    document.getElementById('cardioInputs').style.display = isCardio ? 'block' : 'none';
+
+    // Sets-Log Header anpassen
+    document.getElementById('setsLogHeader').innerHTML = isCardio
+      ? '<span>#</span><span style="text-align:center">MIN</span><span style="text-align:center">RUNDEN</span><span></span>'
+      : '<span>#</span><span style="text-align:center">KG</span><span style="text-align:center">WDH</span><span></span>';
+
+    // Felder leeren
     document.getElementById('inputWeight').value = '';
     document.getElementById('inputReps').value   = '';
+    document.getElementById('inputZeit').value   = '';
+    document.getElementById('inputRunden').value = '';
 
     // Letzte Session laden
     const box = document.getElementById('lastSessionBox');
@@ -1120,6 +1160,49 @@
   // ⏳ Speichern... → ✓ (gespeichert) oder ✕ (Fehler)
 
   async function addSet() {
+    const isCardio   = state.type === 'Cardio';
+    const datumWert  = document.getElementById('inputDatum').value || todayISO;
+
+    // Validierung je nach Trainingsart
+    if (isCardio) {
+      const zeit   = document.getElementById('inputZeit').value;
+      const runden = document.getElementById('inputRunden').value;
+      if (!zeit) { showToast('Bitte Zeit eingeben', 'error'); return; }
+
+      const satzNummer = state.currentSets.length + 1;
+      const satz = { zeit: parseFloat(zeit), runden: parseInt(runden) || 1, status: 'saving', isCardio: true };
+      state.currentSets.push(satz);
+
+      renderSetsLog();
+      document.getElementById('finishExBtn').disabled = false;
+      document.getElementById('inputZeit').value   = '';
+      document.getElementById('inputRunden').value = '';
+      document.getElementById('inputZeit').focus();
+
+      const satzData = {
+        datum:          datumWert,
+        uhrzeit:        new Date().toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' }),
+        trainingsart:   state.type,
+        uebung:         state.currentExercise,
+        satz:           satzNummer,
+        zeit_minuten:   parseFloat(zeit),
+        runden:         parseInt(runden) || 1,
+        nutzer:         state.nutzer
+      };
+
+      try {
+        await saveSatz(satzData);
+        satz.status = 'saved';
+      } catch (err) {
+        console.error('Speichern fehlgeschlagen:', err);
+        satz.status = 'error';
+        showToast('⚠ Satz nicht gespeichert', 'error');
+      }
+      renderSetsLog();
+      return;
+    }
+
+    // Kraft-Training
     const weight = document.getElementById('inputWeight').value;
     const reps   = document.getElementById('inputReps').value;
 
@@ -1129,34 +1212,28 @@
     }
 
     const satzNummer = state.currentSets.length + 1;
-
-    // Satz zum lokalen state hinzufügen
     const satz = {
       weight:  parseFloat(weight),
       reps:    parseInt(reps),
-      status:  'saving',  // Status für UI: saving | saved | error
-      dbId:    null       // ID die Supabase zurückgibt (für späteres Löschen)
+      status:  'saving',
+      dbId:    null
     };
     state.currentSets.push(satz);
 
     renderSetsLog();
     document.getElementById('finishExBtn').disabled = false;
-
-    // Wiederholungsfeld leeren, Fokus setzen
     document.getElementById('inputReps').value = '';
     document.getElementById('inputReps').focus();
 
-    // Daten-Objekt für Supabase zusammenbauen
-    // Spaltennamen müssen EXAKT mit der Tabelle übereinstimmen
     const satzData = {
-      datum:          todayISO,
+      datum:          datumWert,
       uhrzeit:        new Date().toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' }),
       trainingsart:   state.type,
       uebung:         state.currentExercise,
       satz:           satzNummer,
       gewicht_kg:     parseFloat(weight),
       wiederholungen: parseInt(reps),
-      nutzer:         state.nutzer  // bleibt für Anzeige/Filter
+      nutzer:         state.nutzer
     };
 
     // Satz an Supabase senden (im Hintergrund)
@@ -1194,20 +1271,25 @@
       const row = document.createElement('div');
       row.className = 'set-row';
 
-      // Status-Icon je nach Speicherstatus
-      const statusIcon = s.status === 'saving' ? '⏳'
-                       : s.status === 'saved'  ? '✓'
-                       : '✕';
-      const statusClass = s.status === 'saving' ? 'saving'
-                        : s.status === 'saved'  ? 'saved'
-                        : 'error';
+      const statusIcon  = s.status === 'saving' ? '⏳' : s.status === 'saved' ? '✓' : '✕';
+      const statusClass = s.status === 'saving' ? 'saving' : s.status === 'saved' ? 'saved' : 'error';
 
-      row.innerHTML = `
-        <span class="set-num">${i + 1}</span>
-        <span class="set-val">${s.weight} kg</span>
-        <span class="set-val">${s.reps} ×</span>
-        <span class="set-sync ${statusClass}">${statusIcon}</span>
-      `;
+      // Cardio oder Kraft?
+      if (s.isCardio) {
+        row.innerHTML = `
+          <span class="set-num">${i + 1}</span>
+          <span class="set-val">${s.zeit} min</span>
+          <span class="set-val">${s.runden} ×</span>
+          <span class="set-sync ${statusClass}">${statusIcon}</span>
+        `;
+      } else {
+        row.innerHTML = `
+          <span class="set-num">${i + 1}</span>
+          <span class="set-val">${s.weight} kg</span>
+          <span class="set-val">${s.reps} ×</span>
+          <span class="set-sync ${statusClass}">${statusIcon}</span>
+        `;
+      }
       rows.appendChild(row);
     });
 
