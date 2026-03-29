@@ -1513,6 +1513,7 @@
   document.getElementById('prMaxRunden').textContent     = `${meiste} ×`;
   document.getElementById('prSessions').textContent      = sessions;
   document.getElementById('prBlock').style.display       = 'block';
+  document.getElementById('prMaxRunden').style.display   = 'flex';  
 }
 
   function renderCardioChart(daten) {
@@ -1585,12 +1586,13 @@
 
     const fmtDate = iso => { const [j,m,t] = iso.split('-'); return `${t}.${m}.${j}`; };
 
-    document.getElementById('prMaxWeight').textContent     = `${maxGewicht.gewicht_kg} kg`;
-    document.getElementById('prMaxWeightDate').textContent  = fmtDate(maxGewicht.datum);
-    document.getElementById('prMaxVol').textContent         = `${Math.round(besteDatum[1])} kg`;
-    document.getElementById('prMaxVolDate').textContent     = fmtDate(besteDatum[0]);
-    document.getElementById('prSessions').textContent       = sessions;
-    document.getElementById('prBlock').style.display        = 'block';
+    document.getElementById('prMaxWeight').textContent       = `${maxGewicht.gewicht_kg} kg`;
+    document.getElementById('prMaxWeightDate').textContent   = fmtDate(maxGewicht.datum);
+    document.getElementById('prMaxVol').textContent          = `${Math.round(besteDatum[1])} kg`;
+    document.getElementById('prMaxVolDate').textContent      = fmtDate(besteDatum[0]);
+    document.getElementById('prSessions').textContent        = sessions;
+    document.getElementById('prBlock').style.display         = 'block';
+    document.getElementById('prMaxRunden').style.display     = 'none';
   }
 
   function renderVolumeChart(daten) {
