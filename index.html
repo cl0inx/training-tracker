@@ -395,17 +395,17 @@
   <div class="card-grid">
     <div class="type-card" onclick="selectType('Beine/Schultern')">
       <div class="icon">🦵</div>
-      <div class="name">Beine/Schultern</div>
+      <div class="name">Beine / Schultern</div>
       <div class="sub" id="count-Beine/Schultern">Lädt...</div>
     </div>
     <div class="type-card" onclick="selectType('Brust/Trizeps')">
       <div class="icon">💪</div>
-      <div class="name">Brust/Trizeps</div>
+      <div class="name">Brust / Trizeps</div>
       <div class="sub" id="count-Brust/Trizeps">Lädt...</div>
     </div>
     <div class="type-card" onclick="selectType('Rücken/Bizeps')">
       <div class="icon">🏋️</div>
-      <div class="name">Rücken/Bizeps</div>
+      <div class="name">Rücken / Bizeps</div>
       <div class="sub" id="count-Rücken/Bizeps">Lädt...</div>
     </div>
     <div class="type-card" onclick="selectType('Cardio')">
@@ -791,6 +791,7 @@
   let state = {
     nutzer: null,
     token:  null,          // JWT Token von Supabase Auth
+    userId: null,          // UUID des eingeloggten Users
     type: null,
     currentExercise: null,
     currentSets: [],
@@ -866,12 +867,13 @@
     }
 
     // Erfolgreich → loginUser prüft Profil
-    await loginUser(null, data.session.access_token);
+    await loginUser(null, data.session.access_token, data.user.id);
   }
 
   // Nutzer einloggen: Token setzen, Profil prüfen, Übungen laden
-  async function loginUser(name, token) {
+  async function loginUser(name, token, userId) {
     state.token = token;
+    state.userId = userId || null;
 
     // Header mit Auth Token aktualisieren
     headers['Authorization'] = `Bearer ${token}`;
@@ -910,7 +912,7 @@
     const res = await fetch(`${SUPABASE_URL}/rest/v1/profile`, {
       method:  'POST',
       headers: { ...headers, 'Prefer': 'return=minimal' },
-      body:    JSON.stringify({ name })
+      body:    JSON.stringify({ id: state.userId, name })
     });
 
     if (!res.ok) {
