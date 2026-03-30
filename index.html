@@ -1348,9 +1348,8 @@
 
     // Satz an Supabase senden (im Hintergrund)
     try {
-      const savedId = await saveSatz(satzData);
+      await saveSatz(satzData);
       satz.status = 'saved';
-      satz.dbId   = savedId;
 
       // lastWeights aktualisieren damit nächste Übung aktuell ist
       lastWeights[state.currentExercise] = {
@@ -1599,33 +1598,32 @@
   }
 
   function renderCardioPR(daten) {
-  // Beste Pace berechnen: niedrigste Zeit pro Runde
-  const mitPace = daten
-    .filter(d => d.runden > 0)
-    .map(d => ({ ...d, pace: d.zeit_minuten / d.runden }));
+    // Beste Pace berechnen: niedrigste Zeit pro Runde
+    const mitPace = daten
+      .filter(d => d.runden > 0)
+      .map(d => ({ ...d, pace: d.zeit_minuten / d.runden }));
 
-  const bestePace  = mitPace.length ? Math.min(...mitPace.map(d => d.pace)) : null;
-  const laengste   = Math.max(...daten.map(d => d.zeit_minuten));
-  const meiste     = Math.max(...daten.map(d => d.runden || 0));
+    const bestePace = mitPace.length ? Math.min(...mitPace.map(d => d.pace)) : null;
+    const laengste  = Math.max(...daten.map(d => d.zeit_minuten));
+    const meiste    = Math.max(...daten.map(d => d.runden || 0));
 
-  // Pace formatieren: 4.5 → "4:30 min/Runde"
-  const formatPace = p => {
-    const min = Math.floor(p);
-    const sek = Math.round((p - min) * 60).toString().padStart(2, '0');
-    return `${min}:${sek} min/Rd`;
-  };
+    // Pace formatieren: 4.5 → "4:30 min/Runde"
+    const formatPace = p => {
+      const min = Math.floor(p);
+      const sek = Math.round((p - min) * 60).toString().padStart(2, '0');
+      return `${min}:${sek} min/Rd`;
+    };
 
-  const fmtDate = iso => { const [j,m,t] = iso.split('-'); return `${t}.${m}.${j}`; };
-  const sessions = new Set(daten.map(d => d.datum)).size;
+    const sessions = new Set(daten.map(d => d.datum)).size;
 
-  document.getElementById('prMaxWeight').textContent     = bestePace ? formatPace(bestePace) : '–';
-  document.getElementById('prMaxWeightDate').textContent = 'Beste Pace';
-  document.getElementById('prMaxVol').textContent        = `${laengste} min`;
-  document.getElementById('prMaxVolDate').textContent    = 'Längste Einheit';
-  document.getElementById('prMaxRundenWert').textContent = `${meiste} ×`;
-  document.getElementById('prMaxRunden').style.display   = 'flex';
-  document.getElementById('prSessions').textContent      = sessions;
-  document.getElementById('prBlock').style.display       = 'block';
+    document.getElementById('prMaxWeight').textContent     = bestePace ? formatPace(bestePace) : '–';
+    document.getElementById('prMaxWeightDate').textContent = 'Beste Pace';
+    document.getElementById('prMaxVol').textContent        = `${laengste} min`;
+    document.getElementById('prMaxVolDate').textContent    = 'Längste Einheit';
+    document.getElementById('prMaxRundenWert').textContent = `${meiste} ×`;
+    document.getElementById('prMaxRunden').style.display   = 'flex';
+    document.getElementById('prSessions').textContent      = sessions;
+    document.getElementById('prBlock').style.display       = 'block';
   }
 
   function renderCardioChart(daten) {
