@@ -1387,23 +1387,23 @@
       // Cardio oder Kraft?
       if (s.isCardio) {
         const kannLoeschen = s.status === 'saved' && s.dbId;
-          row.innerHTML = `
-            <span class="set-num">${i + 1}</span>
-            <span class="set-val">${s.weight} kg</span>
-            <span class="set-val">${s.reps} ×</span>
-            <span class="${kannLoeschen ? 'del-btn' : 'set-sync ' + statusClass}"
-                  ${kannLoeschen ? `onclick="deleteSatz(${s.dbId}, ${i})"` : ''}
-            >${kannLoeschen ? '✕' : statusIcon}</span>
-
-            
-`;
+        row.innerHTML = `
+          <span class="set-num">${i + 1}</span>
+          <span class="set-val">${s.zeit} min</span>
+          <span class="set-val">${s.runden} ×</span>
+          <span class="${kannLoeschen ? 'del-btn' : 'set-sync ' + statusClass}"
+                ${kannLoeschen ? `onclick="deleteSatz(${s.dbId}, ${i})"` : ''}
+          >${kannLoeschen ? '✕' : statusIcon}</span>
         `;
       } else {
+        const kannLoeschen = s.status === 'saved' && s.dbId;
         row.innerHTML = `
           <span class="set-num">${i + 1}</span>
           <span class="set-val">${s.weight} kg</span>
           <span class="set-val">${s.reps} ×</span>
-          <span class="set-sync ${statusClass}">${statusIcon}</span>
+          <span class="${kannLoeschen ? 'del-btn' : 'set-sync ' + statusClass}"
+                ${kannLoeschen ? `onclick="deleteSatz(${s.dbId}, ${i})"` : ''}
+          >${kannLoeschen ? '✕' : statusIcon}</span>
         `;
       }
       rows.appendChild(row);
