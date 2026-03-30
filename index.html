@@ -358,6 +358,30 @@
 </div>
 
 
+<!-- SCREEN 0b: Onboarding – Name vergeben (nur beim ersten Login) -->
+<div class="screen" id="screen-onboarding">
+  <div class="steps">
+    <div class="step-dot done"></div>
+    <div class="step-dot active"></div>
+    <div class="step-dot"></div>
+    <div class="step-dot"></div>
+  </div>
+  <div class="section-label">Wie sollen<br><span>wir dich nennen?</span></div>
+  <div style="font-size:0.85rem;color:var(--muted);">
+    Dieser Name erscheint in der App und wird deinen Daten zugeordnet.
+  </div>
+  <div style="display:flex;flex-direction:column;gap:14px;">
+    <div class="input-group">
+      <label>Dein Name</label>
+      <input type="text" id="onboardingName" placeholder="z.B. Colin"
+             autocomplete="name"
+             style="font-size:1.5rem;text-align:center;padding:14px;font-weight:600;">
+    </div>
+    <button class="btn-primary" onclick="saveOnboardingName()">Weiter →</button>
+  </div>
+</div>
+
+
 <!-- SCREEN 1: Trainingsart -->
 <div class="screen" id="screen-type">
   <div class="steps">
@@ -844,25 +868,70 @@
       return;
     }
 
-    // Erfolgreich → Nutzername aus E-Mail ableiten
-    // colin@training.app → "Colin"
-    const emailName = email.split('@')[0];
-    const name = emailName.charAt(0).toUpperCase() + emailName.slice(1);
-
-    await loginUser(name, data.session.access_token);
+    // Erfolgreich → loginUser prüft Profil
+    await loginUser(null, data.session.access_token);
   }
 
-  // Nutzer einloggen: Token setzen, Übungen laden, zur Trainingsart
+  // Nutzer einloggen: Token setzen, Profil prüfen, Übungen laden
   async function loginUser(name, token) {
-    state.nutzer = name;
-    state.token  = token;
+    state.token = token;
 
     // Header mit Auth Token aktualisieren
-    // Ab jetzt trägt jede Anfrage den JWT Token → RLS greift korrekt
     headers['Authorization'] = `Bearer ${token}`;
 
+    // Profil aus Supabase laden
+    const profil = await loadProfile();
+
+    if (!profil) {
+      // Kein Profil → Onboarding zeigen
+      showScreen('screen-onboarding');
+      document.getElementById('onboardingName').focus();
+      return;
+    }
+
+    // Profil vorhanden → Name setzen und weitermachen
+    await finishLogin(profil.name);
+  }
+
+  // Profil aus Supabase laden
+  async function loadProfile() {
+    const res  = await fetch(`${SUPABASE_URL}/rest/v1/profile?select=name`, { headers });
+    const data = await res.json();
+    return data[0] || null;
+  }
+
+  // Onboarding: Name speichern
+  async function saveOnboardingName() {
+    const name = document.getElementById('onboardingName').value.trim();
+    if (!name) { showToast('Bitte einen Namen eingeben', 'error'); return; }
+
+    const btn = document.querySelector('#screen-onboarding .btn-primary');
+    btn.textContent = 'Speichern...';
+    btn.disabled    = true;
+
+    // Profil in Supabase anlegen
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/profile`, {
+      method:  'POST',
+      headers: { ...headers, 'Prefer': 'return=minimal' },
+      body:    JSON.stringify({ name })
+    });
+
+    if (!res.ok) {
+      showToast('Fehler beim Speichern', 'error');
+      btn.textContent = 'Weiter →';
+      btn.disabled    = false;
+      return;
+    }
+
+    await finishLogin(name);
+  }
+
+  // Login abschließen: Name setzen, Übungen laden, zur Trainingsart
+  async function finishLogin(name) {
+    state.nutzer = name;
+
     document.getElementById('connText').textContent = name + ' · ✓';
-    document.getElementById('connBadge').className = 'connection-badge ok';
+    document.getElementById('connBadge').className  = 'connection-badge ok';
 
     // Übungen laden
     await loadAllExercises();
@@ -885,13 +954,12 @@
   }
 
   // Beim Laden der Seite: prüfen ob noch eine Session aktiv ist
-  // Wenn ja → direkt einloggen ohne Login-Screen
   async function checkExistingSession() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (session) {
-      const emailName = session.user.email.split('@')[0];
-      const name = emailName.charAt(0).toUpperCase() + emailName.slice(1);
-      await loginUser(name, session.access_token);
+      // Token direkt setzen damit loadProfile funktioniert
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+      await loginUser(null, session.access_token);
     } else {
       setConnectionStatus('ok');
     }
@@ -1101,7 +1169,7 @@
         body:   JSON.stringify({
           name:         name,
           trainingsart: state.type,
-          nutzer:       state.nutzer  // für Anzeige/Filter
+          // nutzer wird automatisch vom Supabase Trigger gesetzt
         })
       });
 
@@ -1200,7 +1268,7 @@
         satz:           satzNummer,
         zeit_minuten:   parseFloat(zeit),
         runden:         parseInt(runden) || 1,
-        nutzer:         state.nutzer
+        // nutzer wird automatisch vom Supabase Trigger gesetzt
       };
 
       try {
@@ -1246,7 +1314,7 @@
       satz:           satzNummer,
       gewicht_kg:     parseFloat(weight),
       wiederholungen: parseInt(reps),
-      nutzer:         state.nutzer
+      // nutzer wird automatisch vom Supabase Trigger gesetzt
     };
 
     // Satz an Supabase senden (im Hintergrund)
@@ -1426,6 +1494,9 @@
   });
   document.getElementById('loginEmail').addEventListener('keydown', e => {
     if (e.key === 'Enter') document.getElementById('loginPassword').focus();
+  });
+  document.getElementById('onboardingName').addEventListener('keydown', e => {
+    if (e.key === 'Enter') saveOnboardingName();
   });
 
   // ═══════════════════════════════════════════════════════
