@@ -665,14 +665,14 @@
   // ── Einen Satz in Supabase speichern ──────────────────
   // "async" = diese Funktion ist asynchron (wartet auf Antworten)
   async function saveSatz(satzData) {
-    // fetch() sendet HTTP POST an Supabase
-    // URL-Aufbau: SUPABASE_URL + /rest/v1/ + Tabellenname
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}`, {
       method:  'POST',
-      headers: headers,
-      body:    JSON.stringify(satzData)  // Objekt → JSON-String
+      headers: { ...headers, 'Prefer': 'return=representation' },
+      body:    JSON.stringify(satzData)
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return data[0]?.id || null;
   }
 
   // ── Letztes Gewicht pro Übung laden ───────────────────
@@ -1160,6 +1160,26 @@
       showToast('Fehler beim Löschen', 'error');
     }
   }
+    async function deleteSatz(dbId, index) {
+    const bestaetigt = window.confirm('Satz wirklich löschen?');
+    if (!bestaetigt) return;
+  
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${dbId}`,
+      { method: 'DELETE', headers }
+    );
+  
+    if (res.ok) {
+      state.currentSets.splice(index, 1);
+      renderSetsLog();
+      if (state.currentSets.length === 0) {
+        document.getElementById('finishExBtn').disabled = true;
+      }
+      showToast('Satz gelöscht', 'success');
+    } else {
+      showToast('Fehler beim Löschen', 'error');
+    }
+  }
   
   // Neue Übung in Supabase speichern
   async function saveNewExercise() {
@@ -1280,8 +1300,9 @@
       };
 
       try {
-        await saveSatz(satzData);
+        const savedId = await saveSatz(satzData);
         satz.status = 'saved';
+        satz.dbId   = savedId;
       } catch (err) {
         console.error('Speichern fehlgeschlagen:', err);
         satz.status = 'error';
@@ -1365,11 +1386,17 @@
 
       // Cardio oder Kraft?
       if (s.isCardio) {
-        row.innerHTML = `
-          <span class="set-num">${i + 1}</span>
-          <span class="set-val">${s.zeit} min</span>
-          <span class="set-val">${s.runden} ×</span>
-          <span class="set-sync ${statusClass}">${statusIcon}</span>
+        const kannLoeschen = s.status === 'saved' && s.dbId;
+          row.innerHTML = `
+            <span class="set-num">${i + 1}</span>
+            <span class="set-val">${s.weight} kg</span>
+            <span class="set-val">${s.reps} ×</span>
+            <span class="${kannLoeschen ? 'del-btn' : 'set-sync ' + statusClass}"
+                  ${kannLoeschen ? `onclick="deleteSatz(${s.dbId}, ${i})"` : ''}
+            >${kannLoeschen ? '✕' : statusIcon}</span>
+
+            
+`;
         `;
       } else {
         row.innerHTML = `
