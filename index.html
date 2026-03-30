@@ -1160,7 +1160,7 @@
       showToast('Fehler beim Löschen', 'error');
     }
   }
-    async function deleteSatz(dbId, index) {
+  async function deleteSatz(dbId, index) {
     const bestaetigt = window.confirm('Satz wirklich löschen?');
     if (!bestaetigt) return;
   
