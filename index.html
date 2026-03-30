@@ -956,7 +956,7 @@
     if (session) {
       // Token direkt setzen damit loadProfile funktioniert
       headers['Authorization'] = `Bearer ${session.access_token}`;
-      await loginUser(null, session.access_token);
+      await loginUser(null, session.access_token, session.user.id);
     } else {
       setConnectionStatus('ok');
     }
