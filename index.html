@@ -1348,8 +1348,9 @@
 
     // Satz an Supabase senden (im Hintergrund)
     try {
-      await saveSatz(satzData);
+      const savedId = await saveSatz(satzData);
       satz.status = 'saved';
+      satz.dbId   = savedId;
 
       // lastWeights aktualisieren damit nächste Übung aktuell ist
       lastWeights[state.currentExercise] = {
