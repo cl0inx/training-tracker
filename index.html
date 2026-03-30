@@ -393,20 +393,20 @@
   <button class="btn-back" onclick="logoutUser()" style="color:var(--muted);">Abmelden</button>
   <div class="section-label">Was trainierst<br><span>du heute?</span></div>
   <div class="card-grid">
-    <div class="type-card" onclick="selectType('Beine')">
+    <div class="type-card" onclick="selectType('Beine/Schultern')">
       <div class="icon">🦵</div>
-      <div class="name">Beine</div>
-      <div class="sub" id="count-Beine">Lädt...</div>
+      <div class="name">Beine/Schultern</div>
+      <div class="sub" id="count-Beine/Schultern">Lädt...</div>
     </div>
-    <div class="type-card" onclick="selectType('Brust')">
+    <div class="type-card" onclick="selectType('Brust/Trizeps')">
       <div class="icon">💪</div>
-      <div class="name">Brust</div>
-      <div class="sub" id="count-Brust">Lädt...</div>
+      <div class="name">Brust/Trizeps</div>
+      <div class="sub" id="count-Brust/Trizeps">Lädt...</div>
     </div>
-    <div class="type-card" onclick="selectType('Rücken')">
+    <div class="type-card" onclick="selectType('Rücken/Bizeps')">
       <div class="icon">🏋️</div>
-      <div class="name">Rücken</div>
-      <div class="sub" id="count-Rücken">Lädt...</div>
+      <div class="name">Rücken/Bizeps</div>
+      <div class="sub" id="count-Rücken/Bizeps">Lädt...</div>
     </div>
     <div class="type-card" onclick="selectType('Cardio')">
       <div class="icon">🏃</div>
@@ -934,7 +934,7 @@
     await loadAllExercises();
 
     // Übungsanzahl auf Karten setzen
-    ['Beine', 'Brust', 'Rücken', 'Cardio'].forEach(art => {
+    ['Beine/Schultern', 'Brust/Trizeps', 'Rücken/Bizeps', 'Cardio'].forEach(art => {
       const anzahl = (state.allExercises[art] || []).length;
       const el = document.getElementById('count-' + art);
       if (el) el.textContent = anzahl + ' Übungen';
