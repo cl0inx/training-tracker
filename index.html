@@ -153,6 +153,7 @@
   }
   .btn-secondary:active { transform: scale(0.98); }
   .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-secondary.active { border-color: var(--accent); color: var(--accent); background: #1e2200; }
 
   .btn-danger {
     background: transparent; color: var(--accent2); border: 1.5px solid var(--accent2);
@@ -1040,13 +1041,13 @@
 
       if (editMode && !standardUebungen.includes(ex)) {
         // Edit-Modus: Löschen-Button zeigen
-        btn.style.display        = 'flex';
-        btn.style.justifyContent = 'space-between';
-        btn.style.alignItems     = 'center';
+        btn.style.display             = 'grid';
+        btn.style.gridTemplateColumns = '1fr auto';
+        btn.style.alignItems          = 'center';
         btn.innerHTML = `
-          <span>${ex}</span>
+          <span style="text-align:left">${ex}</span>
           <span onclick="event.stopPropagation(); deleteExercise('${ex}')"
-                style="color:var(--accent2);font-size:1.1rem;padding:2px 6px;">✕</span>
+                style="color:var(--accent2);font-size:1.1rem;padding:2px 6px;line-height:1;">✕</span>
         `;
       } else if (doneNames.includes(ex)) {
         // Übung bereits abgeschlossen
@@ -1075,8 +1076,9 @@
     const editBtn = document.createElement('button');
     editBtn.className = 'btn-secondary';
     editBtn.id = 'editModeBtn';
-    editBtn.textContent = 'Bearbeiten';
+    editBtn.textContent = editMode ? 'Fertig ✓' : 'Bearbeiten';
     editBtn.onclick = toggleEditMode;
+    if (editMode) editBtn.classList.add('active');
     
     btnRow.appendChild(addBtn);
     btnRow.appendChild(editBtn);
@@ -1120,9 +1122,7 @@
 
     // Button-Text je nach Zustand ändern
     const btn = document.getElementById('editModeBtn');
-    btn.textContent = editMode ? 'Fertig ✓' : 'Übungen bearbeiten';
-    btn.style.borderColor = editMode ? 'var(--accent)' : '';
-    btn.style.color       = editMode ? 'var(--accent)' : '';
+    // Stil wird in renderExerciseButtons gesetzt
 
     // Buttons neu rendern – jetzt mit oder ohne ✕
     renderExerciseButtons();
@@ -1141,7 +1141,7 @@
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/uebungen`
         + `?name=eq.${encodeURIComponent(name)}`,
-        { method: 'DELETE', headers }
+        { method: 'DELETE', headers: { ...headers, 'Prefer': 'return=minimal' } }
       );
 
       if (!res.ok) throw new Error();
@@ -1169,7 +1169,7 @@
   
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${dbId}`,
-      { method: 'DELETE', headers }
+      { method: 'DELETE', headers: { ...headers, 'Prefer': 'return=minimal' } }
     );
   
     if (res.ok) {
