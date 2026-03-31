@@ -199,6 +199,17 @@
   .connection-badge.err .connection-dot { background: var(--accent2); }
   .connection-badge.err { color: var(--accent2); border-color: var(--accent244); }
 
+  .confirm-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200; padding: 20px;
+  }
+  .confirm-box {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 24px 20px;
+    width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 16px;
+  }
+  .confirm-msg { font-size: 1rem; font-weight: 500; text-align: center; }
   .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #0d0d0d; border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -1163,8 +1174,25 @@
       showToast('Fehler beim Löschen', 'error');
     }
   }
+  function showConfirm(msg) {
+    return new Promise(resolve => {
+      document.getElementById('confirmMsg').textContent = msg;
+      document.getElementById('confirmOverlay').style.display = 'flex';
+      const yes = document.getElementById('confirmYes');
+      const no  = document.getElementById('confirmNo');
+      const cleanup = (result) => {
+        document.getElementById('confirmOverlay').style.display = 'none';
+        yes.replaceWith(yes.cloneNode(true));
+        no.replaceWith(no.cloneNode(true));
+        resolve(result);
+      };
+      document.getElementById('confirmYes').onclick = () => cleanup(true);
+      document.getElementById('confirmNo').onclick  = () => cleanup(false);
+    });
+  }
+
   async function deleteSatz(dbId, index) {
-    const bestaetigt = window.confirm('Satz wirklich löschen?');
+    const bestaetigt = await showConfirm('Satz wirklich löschen?');
     if (!bestaetigt) return;
   
     const res = await fetch(
@@ -1351,8 +1379,9 @@
 
     // Satz an Supabase senden (im Hintergrund)
     try {
-      await saveSatz(satzData);
+      const savedId = await saveSatz(satzData);
       satz.status = 'saved';
+      satz.dbId   = savedId;
 
       // lastWeights aktualisieren damit nächste Übung aktuell ist
       lastWeights[state.currentExercise] = {
@@ -1757,5 +1786,17 @@
   }
 
 </script>
+
+<!-- Confirm Dialog -->
+<div id="confirmOverlay" class="confirm-overlay" style="display:none;">
+  <div class="confirm-box">
+    <div class="confirm-msg" id="confirmMsg"></div>
+    <div class="btn-row">
+      <button class="btn-secondary" id="confirmNo">Abbrechen</button>
+      <button class="btn-danger"    id="confirmYes">Löschen</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
