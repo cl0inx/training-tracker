@@ -121,8 +121,13 @@
   .input-group input:focus { border-color: var(--accent); }
 
   .sets-log { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; }
+  .set-row-wrapper { display: grid; grid-template-columns: 1fr auto; align-items: center; border-bottom: 1px solid var(--border); }
+  .set-row-wrapper:last-child { border-bottom: none; }
+  .set-del-btn { background: none; border: none; border-left: 1px solid var(--border); color: var(--muted); cursor: pointer; font-size: 1rem; padding: 10px 14px; height: 100%; transition: color 0.2s, background 0.2s; }
+  .set-del-btn:hover { color: var(--accent2); background: rgba(255,92,58,0.08); }
+  .set-del-btn:disabled { opacity: 0.2; cursor: not-allowed; }
   .sets-log-header { display: grid; grid-template-columns: 32px 1fr 1fr 32px; padding: 8px 14px; font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); }
-  .set-row { display: grid; grid-template-columns: 32px 1fr 1fr 32px; padding: 10px 14px; font-size: 0.9rem; border-bottom: 1px solid var(--border); align-items: center; animation: slideIn 0.2s ease; }
+  .set-row { display: grid; grid-template-columns: 32px 1fr 1fr 24px; padding: 10px 14px; font-size: 0.9rem; align-items: center; animation: slideIn 0.2s ease; }
   .set-row:last-child { border-bottom: none; }
   .set-num { color: var(--accent); font-weight: 700; font-size: 0.85rem; }
   .set-val { font-weight: 600; text-align: center; }
@@ -678,13 +683,20 @@
   // ── Einen Satz in Supabase speichern ──────────────────
   // "async" = diese Funktion ist asynchron (wartet auf Antworten)
   async function saveSatz(satzData) {
+    const saveHeaders = {
+      'apikey':        SUPABASE_KEY,
+      'Authorization': headers['Authorization'],
+      'Content-Type':  'application/json',
+      'Prefer':        'return=representation'
+    };
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}`, {
       method:  'POST',
-      headers: { ...headers, 'Prefer': 'return=representation' },
+      headers: saveHeaders,
       body:    JSON.stringify(satzData)
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+    console.log('saveSatz response:', data);
     return data[0]?.id || null;
   }
 
@@ -1410,35 +1422,43 @@
     rows.innerHTML = '';
 
     state.currentSets.forEach((s, i) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'set-row-wrapper';
+
       const row = document.createElement('div');
       row.className = 'set-row';
 
       const statusIcon  = s.status === 'saving' ? '⏳' : s.status === 'saved' ? '✓' : '✕';
       const statusClass = s.status === 'saving' ? 'saving' : s.status === 'saved' ? 'saved' : 'error';
 
-      // Cardio oder Kraft?
       if (s.isCardio) {
-        const kannLoeschen = s.status === 'saved' && s.dbId;
         row.innerHTML = `
           <span class="set-num">${i + 1}</span>
           <span class="set-val">${s.zeit} min</span>
           <span class="set-val">${s.runden} ×</span>
-          <span class="${kannLoeschen ? 'del-btn' : 'set-sync ' + statusClass}"
-                ${kannLoeschen ? `onclick="deleteSatz(${s.dbId}, ${i})"` : ''}
-          >${kannLoeschen ? '✕' : statusIcon}</span>
+          <span class="set-sync ${statusClass}">${statusIcon}</span>
         `;
       } else {
-        const kannLoeschen = s.status === 'saved' && s.dbId;
         row.innerHTML = `
           <span class="set-num">${i + 1}</span>
           <span class="set-val">${s.weight} kg</span>
           <span class="set-val">${s.reps} ×</span>
-          <span class="${kannLoeschen ? 'del-btn' : 'set-sync ' + statusClass}"
-                ${kannLoeschen ? `onclick="deleteSatz(${s.dbId}, ${i})"` : ''}
-          >${kannLoeschen ? '✕' : statusIcon}</span>
+          <span class="set-sync ${statusClass}">${statusIcon}</span>
         `;
       }
-      rows.appendChild(row);
+
+      // Separater Löschen-Button rechts versetzt
+      const delBtn = document.createElement('button');
+      delBtn.className  = 'set-del-btn';
+      delBtn.textContent = '✕';
+      delBtn.disabled   = !(s.status === 'saved' && s.dbId);
+      if (s.status === 'saved' && s.dbId) {
+        delBtn.onclick = () => deleteSatz(s.dbId, i);
+      }
+
+      wrapper.appendChild(row);
+      wrapper.appendChild(delBtn);
+      rows.appendChild(wrapper);
     });
 
     document.getElementById('setsLog').style.display =
