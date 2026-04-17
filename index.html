@@ -313,6 +313,67 @@
     display: flex; align-items: center; justify-content: center;
     height: 100%; color: var(--muted); font-size: 0.85rem;
   }
+  /* Export Modal */
+  .export-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+    display: flex; align-items: flex-end; justify-content: center;
+    z-index: 200; padding: 0;
+  }
+  .export-modal {
+    background: var(--surface2); border-top: 1px solid var(--border);
+    border-radius: 20px 20px 0 0; padding: 24px 20px 40px;
+    width: 100%; max-width: 480px;
+    display: flex; flex-direction: column; gap: 16px;
+    max-height: 85vh; overflow-y: auto;
+  }
+  .export-modal-title {
+    font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem;
+    letter-spacing: 1px; color: var(--text);
+  }
+  .quick-periods {
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+  .quick-period-btn {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: 20px; padding: 5px 12px; font-size: 0.78rem;
+    font-family: 'DM Sans', sans-serif; color: var(--muted);
+    cursor: pointer; transition: all 0.2s;
+  }
+  .quick-period-btn.active {
+    background: var(--accent); color: #0d0d0d;
+    border-color: var(--accent); font-weight: 600;
+  }
+  .export-date-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  .export-date-row input[type=date] {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: 10px; color: var(--text);
+    font-family: 'DM Sans', sans-serif; font-size: 0.9rem;
+    padding: 10px 12px; width: 100%; outline: none;
+    transition: border-color 0.2s;
+  }
+  .export-date-row input[type=date]:focus { border-color: var(--accent); }
+  .exercise-checklist {
+    display: flex; flex-direction: column; gap: 6px;
+    max-height: 220px; overflow-y: auto;
+  }
+  .exercise-check-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; background: var(--surface);
+    border: 1.5px solid var(--border); border-radius: 10px;
+    cursor: pointer; transition: border-color 0.2s;
+  }
+  .exercise-check-item.checked { border-color: var(--accent); background: #1e2200; }
+  .exercise-check-item input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
+  .exercise-check-item label { cursor: pointer; font-size: 0.9rem; font-weight: 500; flex: 1; }
+  .select-all-btn {
+    background: none; border: none; color: var(--accent);
+    font-size: 0.78rem; font-family: 'DM Sans', sans-serif;
+    cursor: pointer; padding: 0; text-align: left;
+    font-weight: 600;
+  }
+
   .stats-nav-btn {
     position: fixed; bottom: 24px; right: 20px;
     background: var(--accent); color: #0d0d0d;
@@ -623,6 +684,9 @@
       <div class="chart-placeholder" id="chartPlaceholder">Übung wählen</div>
     </div>
   </div>
+
+  <!-- Export -->
+  <button class="btn-secondary" onclick="openExportModal()" style="border-color:var(--accent);color:var(--accent);">↓ Daten exportieren</button>
 
 </div>
 
@@ -1866,7 +1930,276 @@
     document.getElementById('statsBtn').style.display = 'block';
   }
 
+  // ═══════════════════════════════════════════════════════
+  // CSV EXPORT MODAL
+  // ═══════════════════════════════════════════════════════
+
+  let exportPeriodDays = 30;
+  let exportCustomMode = false;
+
+  function openExportModal() {
+    // Übungsliste befüllen
+    const list = document.getElementById('exportExerciseList');
+    list.innerHTML = '';
+    const alleUebungen = Object.values(state.allExercises).flat();
+    alleUebungen.forEach(ex => {
+      const item = document.createElement('div');
+      item.className = 'exercise-check-item checked';
+      item.dataset.ex = ex;
+      item.innerHTML = `
+        <input type="checkbox" id="chk_${ex.replace(/\s/g,'_')}" checked>
+        <label for="chk_${ex.replace(/\s/g,'_')}">${ex}</label>
+      `;
+      item.onclick = (e) => {
+        if (e.target.tagName === 'INPUT') return;
+        const cb = item.querySelector('input');
+        cb.checked = !cb.checked;
+        item.classList.toggle('checked', cb.checked);
+      };
+      item.querySelector('input').onchange = () => {
+        item.classList.toggle('checked', item.querySelector('input').checked);
+      };
+      list.appendChild(item);
+    });
+
+    // Datum-Felder auf heute setzen
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('exportDateTo').value   = today;
+    document.getElementById('exportDateFrom').value = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+
+    document.getElementById('exportOverlay').style.display = 'flex';
+  }
+
+  function closeExportModal(e) {
+    if (e && e.target !== document.getElementById('exportOverlay')) return;
+    document.getElementById('exportOverlay').style.display = 'none';
+  }
+
+  function setExportPeriod(days, btn) {
+    exportPeriodDays  = days;
+    exportCustomMode  = days === 0;
+    document.querySelectorAll('.quick-period-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('exportCustomDates').style.display = exportCustomMode ? 'block' : 'none';
+  }
+
+  function toggleAllExercises() {
+    const items    = document.querySelectorAll('.exercise-check-item');
+    const allChecked = [...items].every(i => i.querySelector('input').checked);
+    items.forEach(item => {
+      item.querySelector('input').checked = !allChecked;
+      item.classList.toggle('checked', !allChecked);
+    });
+  }
+
+  async function runExport() {
+    // Gewählte Übungen
+    const gewaehlte = [...document.querySelectorAll('.exercise-check-item')]
+      .filter(i => i.querySelector('input').checked)
+      .map(i => i.dataset.ex);
+
+    if (!gewaehlte.length) {
+      showToast('Bitte mindestens eine Übung wählen', 'error');
+      return;
+    }
+
+    // Zeitraum bestimmen
+    let vonDatum, bisDatum;
+    const today = new Date().toISOString().split('T')[0];
+
+    if (exportCustomMode) {
+      vonDatum = document.getElementById('exportDateFrom').value;
+      bisDatum = document.getElementById('exportDateTo').value;
+      if (!vonDatum || !bisDatum) {
+        showToast('Bitte Start- und Enddatum angeben', 'error');
+        return;
+      }
+    } else {
+      vonDatum = exportPeriodDays === 9999
+        ? '2000-01-01'
+        : new Date(Date.now() - exportPeriodDays * 86400000).toISOString().split('T')[0];
+      bisDatum = today;
+    }
+
+    showToast('Export wird vorbereitet…');
+
+    try {
+      // Übungen als IN-Filter
+      const uebungFilter = gewaehlte.map(u => encodeURIComponent(u)).join(',');
+      const url = `${SUPABASE_URL}/rest/v1/${TABLE}`
+        + `?select=datum,uhrzeit,trainingsart,uebung,satz,gewicht_kg,wiederholungen,zeit_minuten,runden`
+        + `&uebung=in.(${uebungFilter})`
+        + `&datum=gte.${vonDatum}&datum=lte.${bisDatum}`
+        + `&order=datum.asc,uebung.asc,satz.asc`;
+
+      const res  = await fetch(url, { headers });
+      const data = await res.json();
+
+      if (!data.length) {
+        showToast('Keine Daten im gewählten Zeitraum', 'error');
+        return;
+      }
+
+      // CSV aufbauen
+      const cols   = ['datum','uhrzeit','trainingsart','uebung','satz','gewicht_kg','wiederholungen','zeit_minuten','runden'];
+      const header = ['Datum','Uhrzeit','Trainingsart','Übung','Satz','Gewicht (kg)','Wiederholungen','Zeit (min)','Runden'];
+
+      const rows = data.map(row =>
+        cols.map(c => {
+          const val = row[c] ?? '';
+          return typeof val === 'string' && (val.includes(';') || val.includes('"'))
+            ? `"${val.replace(/"/g, '""')}"` : val;
+        }).join(';')
+      );
+
+      const csv  = '\uFEFF' + header.join(';') + '\n' + rows.join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const filename = `Training_${vonDatum}_${bisDatum}.csv`;
+      link.href     = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(link.href);
+
+      document.getElementById('exportOverlay').style.display = 'none';
+      showToast(`✓ ${data.length} Zeilen exportiert`, 'success');
+
+    } catch(err) {
+      console.error('Export fehlgeschlagen:', err);
+      showToast('Export fehlgeschlagen', 'error');
+    }
+  }
+
+  async function exportCSV(mode) {
+    const uebung = document.getElementById('statsExerciseSelect').value;
+    const isCurrentMode = mode === 'current';
+
+    // Bei "aktuelle Ansicht" muss eine Übung gewählt sein
+    if (isCurrentMode && !uebung) {
+      showToast('Bitte zuerst eine Übung wählen', 'error');
+      return;
+    }
+
+    showToast('Export wird vorbereitet…');
+
+    try {
+      let url, filename;
+
+      if (isCurrentMode) {
+        // Nur gewählte Übung + gewählter Zeitraum
+        const isCardio = ['Seilspringen', 'Laufen', 'Fahrrad'].some(c => uebung.includes(c));
+        const vonDatum = statsPeriodDays === 9999
+          ? '2000-01-01'
+          : new Date(Date.now() - statsPeriodDays * 86400000).toISOString().split('T')[0];
+
+        url = `${SUPABASE_URL}/rest/v1/${TABLE}`
+          + `?select=datum,uhrzeit,trainingsart,uebung,satz,gewicht_kg,wiederholungen,zeit_minuten,runden`
+          + `&uebung=eq.${encodeURIComponent(uebung)}`
+          + `&datum=gte.${vonDatum}`
+          + `&order=datum.asc,satz.asc`;
+
+        const periodeText = statsPeriodDays === 9999 ? 'Alles' : `${statsPeriodDays}Tage`;
+        filename = `${uebung}_${periodeText}.csv`;
+      } else {
+        // Alle Daten
+        url = `${SUPABASE_URL}/rest/v1/${TABLE}`
+          + `?select=datum,uhrzeit,trainingsart,uebung,satz,gewicht_kg,wiederholungen,zeit_minuten,runden`
+          + `&order=datum.asc,uebung.asc,satz.asc`;
+        filename = `Training_Export_${new Date().toISOString().split('T')[0]}.csv`;
+      }
+
+      const res  = await fetch(url, { headers });
+      const data = await res.json();
+
+      if (!data.length) {
+        showToast('Keine Daten gefunden', 'error');
+        return;
+      }
+
+      // JSON → CSV konvertieren
+      const cols = ['datum','uhrzeit','trainingsart','uebung','satz','gewicht_kg','wiederholungen','zeit_minuten','runden'];
+      const header = ['Datum','Uhrzeit','Trainingsart','Übung','Satz','Gewicht (kg)','Wiederholungen','Zeit (min)','Runden'];
+
+      const rows = data.map(row =>
+        cols.map(c => {
+          const val = row[c] ?? '';
+          // Kommas und Anführungszeichen escapen
+          return typeof val === 'string' && (val.includes(',') || val.includes('"'))
+            ? `"${val.replace(/"/g, '""')}"`
+            : val;
+        }).join(';')   // Semikolon für deutsches Excel
+      );
+
+      const csv = '﻿' + header.join(';') + '
+' + rows.join('
+');  // BOM für Excel-Kompatibilität
+
+      // Download triggern
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href     = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(link.href);
+
+      showToast(`✓ ${data.length} Zeilen exportiert`, 'success');
+
+    } catch(err) {
+      console.error('Export fehlgeschlagen:', err);
+      showToast('Export fehlgeschlagen', 'error');
+    }
+  }
+
 </script>
+
+<!-- Export Modal -->
+<div id="exportOverlay" class="export-overlay" style="display:none;" onclick="closeExportModal(event)">
+  <div class="export-modal">
+    <div class="export-modal-title">Daten exportieren</div>
+
+    <!-- Schnellauswahl Zeitraum -->
+    <div>
+      <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Zeitraum</div>
+      <div class="quick-periods" id="exportQuickPeriods">
+        <button class="quick-period-btn" onclick="setExportPeriod(7, this)">1 Wo</button>
+        <button class="quick-period-btn" onclick="setExportPeriod(14, this)">2 Wo</button>
+        <button class="quick-period-btn active" onclick="setExportPeriod(30, this)">4 Wo</button>
+        <button class="quick-period-btn" onclick="setExportPeriod(90, this)">3 Mo</button>
+        <button class="quick-period-btn" onclick="setExportPeriod(9999, this)">Alles</button>
+        <button class="quick-period-btn" onclick="setExportPeriod(0, this)">Eigenes</button>
+      </div>
+    </div>
+
+    <!-- Eigenes Datum -->
+    <div id="exportCustomDates" style="display:none;">
+      <div class="export-date-row">
+        <div class="input-group">
+          <label>Von</label>
+          <input type="date" id="exportDateFrom">
+        </div>
+        <div class="input-group">
+          <label>Bis</label>
+          <input type="date" id="exportDateTo">
+        </div>
+      </div>
+    </div>
+
+    <!-- Übungen -->
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">Übungen</div>
+        <button class="select-all-btn" onclick="toggleAllExercises()">Alle wählen</button>
+      </div>
+      <div class="exercise-checklist" id="exportExerciseList"></div>
+    </div>
+
+    <!-- Buttons -->
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="closeExportModal()">Abbrechen</button>
+      <button class="btn-primary" onclick="runExport()">↓ Exportieren</button>
+    </div>
+  </div>
+</div>
 
 <!-- Confirm Dialog -->
 <div id="confirmOverlay" class="confirm-overlay" style="display:none;">
