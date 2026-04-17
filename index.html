@@ -2130,9 +2130,7 @@
         }).join(';')   // Semikolon für deutsches Excel
       );
 
-      const csv = '﻿' + header.join(';') + '
-' + rows.join('
-');  // BOM für Excel-Kompatibilität
+      const csv = '\uFEFF' + header.join(';') + '\n' + rows.join('\n');  // BOM für Excel-Kompatibilität
 
       // Download triggern
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
