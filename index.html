@@ -384,6 +384,60 @@
     transition: transform 0.1s, opacity 0.2s;
   }
   .stats-nav-btn:active { transform: scale(0.96); }
+
+  /* ── GIRLY THEME ── */
+  body.theme-girly {
+    --bg: #fff0f5;
+    --surface: #ffe4ee;
+    --surface2: #ffd6e7;
+    --accent: #ff69b4;
+    --text: #2d0015;
+    --muted: #a0527a;
+    --border: #ffb3d1;
+  }
+
+  /* ── THEME CARDS ── */
+  .theme-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .theme-card {
+    background: var(--surface); border: 2px solid var(--border);
+    border-radius: var(--radius); padding: 12px;
+    cursor: pointer; text-align: center; position: relative;
+    transition: border-color 0.2s, transform 0.1s;
+  }
+  .theme-card:active { transform: scale(0.97); }
+  .theme-card.active { border-color: var(--accent); }
+  .theme-preview {
+    border-radius: 8px; height: 56px; margin-bottom: 8px;
+    overflow: hidden; display: flex; flex-direction: column;
+    gap: 4px; padding: 8px;
+  }
+  .theme-preview.dark-preview  { background: #0d0d0d; }
+  .theme-preview.girly-preview { background: #fff0f5; }
+  .dark-preview  .tp-bar   { background: #e8ff47; height: 5px; border-radius: 3px; width: 55%; }
+  .dark-preview  .tp-block { background: #1a1a1a; height: 9px; border-radius: 3px; border: 1px solid #2e2e2e; }
+  .girly-preview .tp-bar   { background: #ff69b4; height: 5px; border-radius: 3px; width: 55%; }
+  .girly-preview .tp-block { background: #ffe4ee; height: 9px; border-radius: 3px; border: 1px solid #ffb3d1; }
+  .theme-card-label { font-size: 0.85rem; font-weight: 600; color: var(--text); }
+  .theme-check {
+    position: absolute; top: 7px; right: 7px;
+    width: 18px; height: 18px; background: var(--accent);
+    border-radius: 50%; color: #0d0d0d;
+    font-size: 0.65rem; font-weight: 700;
+    display: none; align-items: center; justify-content: center;
+  }
+  .theme-card.active .theme-check { display: flex; }
+
+  /* ── MANUAL SCREEN ── */
+  .manual-block {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .manual-title {
+    font-family: 'Bebas Neue', sans-serif; font-size: 1.05rem;
+    letter-spacing: 1px; color: var(--accent);
+  }
+  .manual-body { font-size: 0.85rem; color: var(--muted); line-height: 1.55; }
 </style>
 </head>
 <body>
@@ -391,7 +445,15 @@
 <header>
   <div class="logo">LOGBOOK</div>
   <div style="display:flex;gap:8px;align-items:center;">
-    <!-- Stats Button – nur nach Login sichtbar -->
+    <!-- Nur nach Login sichtbar -->
+    <button class="btn-back" id="manualBtn" onclick="showManual()"
+            style="display:none; color:var(--accent); font-weight:600; font-size:1rem;">
+      ?
+    </button>
+    <button class="btn-back" id="settingsBtn" onclick="showSettingsModal()"
+            style="display:none; color:var(--accent); font-weight:600; font-size:1rem;">
+      ⚙️
+    </button>
     <button class="btn-back" id="statsBtn" onclick="showStats()"
             style="display:none; color:var(--accent); font-weight:600;">
       📊
@@ -690,6 +752,49 @@
 
 </div>
 
+<!-- SCREEN 5: Handbuch -->
+<div class="screen" id="screen-manual">
+  <div style="display:flex;justify-content:space-between;align-items:center;">
+    <button class="btn-back" onclick="showScreen('screen-type')">← Zurück</button>
+  </div>
+  <div class="section-label">Benutzer-<br><span>Handbuch</span></div>
+
+  <div class="manual-block">
+    <div class="manual-title">1. Trainingsart wählen</div>
+    <div class="manual-body">Wähle nach dem Login eine der vier Trainingsarten: Beine/Schultern, Brust/Trizeps, Rücken/Bizeps oder Cardio. Die Anzahl verfügbarer Übungen wird pro Karte angezeigt.</div>
+  </div>
+
+  <div class="manual-block">
+    <div class="manual-title">2. Übung wählen & Sätze eintragen</div>
+    <div class="manual-body">Tippe auf eine Übung um sie zu aktivieren. Trage Gewicht und Wiederholungen (oder Zeit und Runden bei Cardio) ein und tippe "+ Satz hinzufügen". Jeder Satz wird sofort gespeichert – du siehst den Status ⏳ / ✓ / ✕ rechts neben dem Satz. Das letzte Training dieser Übung wird zur Orientierung angezeigt.</div>
+  </div>
+
+  <div class="manual-block">
+    <div class="manual-title">3. Übungen verwalten</div>
+    <div class="manual-body">Mit "+ Hinzufügen" fügst du eine eigene Übung für die aktuelle Trainingsart hinzu. Mit "Bearbeiten" aktivierst du den Edit-Modus und kannst Übungen über das ✕ löschen. Einzelne Sätze kannst du über den ✕-Button rechts in der Satzliste löschen.</div>
+  </div>
+
+  <div class="manual-block">
+    <div class="manual-title">4. Übung abschließen</div>
+    <div class="manual-body">Wenn du alle Sätze eingetragen hast, tippe "Übung fertig ✓". Die Übung wird als abgeschlossen markiert (grüner Haken). Danach wählst du eine neue Übung. Mit "Übung wechseln" kannst du jederzeit zu einer anderen Übung springen, ohne die aktuelle abzuschließen.</div>
+  </div>
+
+  <div class="manual-block">
+    <div class="manual-title">5. Training beenden</div>
+    <div class="manual-body">Sobald mindestens eine Übung abgeschlossen ist, erscheint "Training abschließen →". Er führt zur Zusammenfassung mit allen Übungen und Sätzen. Mit "Neues Training starten" kehrst du zur Trainingsartauswahl zurück.</div>
+  </div>
+
+  <div class="manual-block">
+    <div class="manual-title">6. Auswertung & CSV-Export</div>
+    <div class="manual-body">Das 📊-Icon oben öffnet die Auswertung. Wähle eine Übung und einen Zeitraum um persönliche Bestleistungen und den Volumen-Verlauf als Diagramm zu sehen. Über "↓ Daten exportieren" lädst du alle Trainingsdaten als CSV-Datei herunter – optimiert für deutsches Excel (Semikolon-Trennzeichen, UTF-8 BOM).</div>
+  </div>
+
+  <div class="manual-block">
+    <div class="manual-title">7. Theme wechseln</div>
+    <div class="manual-body">Das ⚙️-Icon oben öffnet die Einstellungen. Dort wählst du zwischen Dark Mode (Standard) und Girly Mode. Das gewählte Theme wird in deinem Profil gespeichert und bei jedem Login automatisch geladen.</div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 
@@ -871,6 +976,7 @@
     nutzer: null,
     token:  null,          // JWT Token von Supabase Auth
     userId: null,          // UUID des eingeloggten Users
+    theme:  'dark',
     type: null,
     currentExercise: null,
     currentSets: [],
@@ -962,13 +1068,13 @@
     }
 
     // Profil vorhanden → Name setzen und weitermachen
-    await finishLogin(profil.name);
+    await finishLogin(profil.name, profil.theme || 'dark');
   }
 
   // Profil aus Supabase laden
   async function loadProfile() {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/profile?select=name`, { headers });
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/profile?select=name,theme`, { headers });
       if (!res.ok) return null;
       const data = await res.json();
       return data[0] || null;
@@ -1000,12 +1106,13 @@
       return;
     }
 
-    await finishLogin(name);
+    await finishLogin(name, 'dark');
   }
 
-  // Login abschließen: Name setzen, Übungen laden, zur Trainingsart
-  async function finishLogin(name) {
+  // Login abschließen: Name setzen, Theme anwenden, Übungen laden, zur Trainingsart
+  async function finishLogin(name, theme = 'dark') {
     state.nutzer = name;
+    applyTheme(theme);
 
     document.getElementById('connText').textContent = name + ' · ✓';
     document.getElementById('connBadge').className  = 'connection-badge ok';
@@ -1020,7 +1127,7 @@
       if (el) el.textContent = anzahl + ' Übungen';
     });
 
-    showStatsButton();
+    showLoggedInButtons();
 
     // Laufende Session wiederherstellen?
     if (restoreSessionCache()) {
@@ -1628,7 +1735,8 @@
 
   function resetAll() {
     clearSessionCache();
-    state = { nutzer: null, token: null, userId: null, type: null, currentExercise: null, currentSets: [], completedExercises: [], customExercises: [], allExercises: {} };
+    const currentTheme = state.theme;
+    state = { nutzer: null, token: null, userId: null, theme: currentTheme, type: null, currentExercise: null, currentSets: [], completedExercises: [], customExercises: [], allExercises: {} };
     // Auth Header zurücksetzen
     headers['Authorization'] = `Bearer ${SUPABASE_KEY}`;
     // Login-Felder leeren
@@ -1637,7 +1745,9 @@
     document.getElementById('loginError').style.display = 'none';
     document.getElementById('connText').textContent = 'Anmelden';
     document.getElementById('connBadge').className  = 'connection-badge';
-    document.getElementById('statsBtn').style.display = 'none';
+    document.getElementById('statsBtn').style.display    = 'none';
+    document.getElementById('settingsBtn').style.display = 'none';
+    document.getElementById('manualBtn').style.display   = 'none';
     showScreen('screen-user');
   }
 
@@ -1933,8 +2043,10 @@
     });
   }
 
-  function showStatsButton() {
-    document.getElementById('statsBtn').style.display = 'block';
+  function showLoggedInButtons() {
+    document.getElementById('statsBtn').style.display    = 'block';
+    document.getElementById('settingsBtn').style.display = 'block';
+    document.getElementById('manualBtn').style.display   = 'block';
   }
 
   // ═══════════════════════════════════════════════════════
@@ -2081,6 +2193,71 @@
     }
   }
 
+  // ═══════════════════════════════════════════════════════
+  // THEME
+  // ═══════════════════════════════════════════════════════
+
+  function applyTheme(theme) {
+    state.theme = theme;
+    document.body.classList.toggle('theme-girly', theme === 'girly');
+  }
+
+  async function saveTheme(theme) {
+    try {
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/profile?id=eq.${state.userId}`,
+        {
+          method:  'PATCH',
+          headers: { ...headers, 'Prefer': 'return=minimal' },
+          body:    JSON.stringify({ theme })
+        }
+      );
+    } catch (err) {
+      console.error('Theme speichern fehlgeschlagen:', err);
+    }
+  }
+
+  function selectTheme(theme) {
+    applyTheme(theme);
+    saveTheme(theme);
+    renderThemeCards();
+  }
+
+  function renderThemeCards() {
+    document.getElementById('themeCardDark').classList.toggle('active',  state.theme !== 'girly');
+    document.getElementById('themeCardGirly').classList.toggle('active', state.theme === 'girly');
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // EINSTELLUNGEN-MODAL
+  // ═══════════════════════════════════════════════════════
+
+  function showSettingsModal() {
+    renderThemeCards();
+    document.getElementById('settingsOverlay').style.display = 'flex';
+  }
+
+  function closeSettingsModal(e) {
+    if (e.target !== document.getElementById('settingsOverlay')) return;
+    document.getElementById('settingsOverlay').style.display = 'none';
+  }
+
+  function dismissSettingsModal() {
+    document.getElementById('settingsOverlay').style.display = 'none';
+  }
+
+  function logoutFromSettings() {
+    dismissSettingsModal();
+    logoutUser();
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // HANDBUCH
+  // ═══════════════════════════════════════════════════════
+
+  function showManual() {
+    showScreen('screen-manual');
+  }
 
 </script>
 
@@ -2130,6 +2307,40 @@
       <button class="btn-secondary" onclick="dismissExportModal()">Abbrechen</button>
       <button class="btn-primary" onclick="runExport()">↓ Exportieren</button>
     </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settingsOverlay" class="export-overlay" style="display:none;" onclick="closeSettingsModal(event)">
+  <div class="export-modal">
+    <div class="export-modal-title">⚙️ Einstellungen</div>
+
+    <div>
+      <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Erscheinungsbild</div>
+      <div class="theme-cards">
+        <div class="theme-card" id="themeCardDark" onclick="selectTheme('dark')">
+          <div class="theme-check" id="checkDark">✓</div>
+          <div class="theme-preview dark-preview">
+            <div class="tp-bar"></div>
+            <div class="tp-block"></div>
+            <div class="tp-block"></div>
+          </div>
+          <div class="theme-card-label">Dark</div>
+        </div>
+        <div class="theme-card" id="themeCardGirly" onclick="selectTheme('girly')">
+          <div class="theme-check" id="checkGirly">✓</div>
+          <div class="theme-preview girly-preview">
+            <div class="tp-bar"></div>
+            <div class="tp-block"></div>
+            <div class="tp-block"></div>
+          </div>
+          <div class="theme-card-label">Girly 🌸</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-danger" onclick="logoutFromSettings()">Abmelden</button>
+    <button class="btn-secondary" onclick="dismissSettingsModal()">Schließen</button>
   </div>
 </div>
 
