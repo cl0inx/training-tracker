@@ -566,6 +566,7 @@
     <div class="step-dot"></div>
   </div>
   <div class="section-label" id="exerciseScreenTitle">Übung wählen</div>
+  <button class="btn-back" id="exerciseChangeLink" onclick="changeExercise()" style="display:none;">← Übung wechseln</button>
 
   <button class="btn-back" onclick="backToType()">← Trainingsart wechseln</button>
 
@@ -582,10 +583,6 @@
   </div>
 
   <div id="setInputSection" style="display:none; flex-direction:column; gap:14px;">
-    <div class="current-exercise-badge">
-      <div class="dot"></div>
-      <span id="currentExerciseName"></span>
-    </div>
 
     <!-- Datum-Feld: vorausgefüllt mit heute, aber änderbar -->
     <div class="input-group">
@@ -639,10 +636,7 @@
 
     <button class="btn-primary" onclick="addSet()">+ Satz hinzufügen</button>
 
-    <div class="btn-row">
-      <button class="btn-secondary" onclick="changeExercise()">Übung wechseln</button>
-      <button class="btn-secondary" id="finishExBtn" onclick="finishExercise()" disabled>Übung fertig ✓</button>
-    </div>
+    <button class="btn-secondary" id="finishExBtn" onclick="finishExercise()" disabled>Übung fertig ✓</button>
   </div>
 
   <div id="noExerciseYet" style="padding: 8px 0;">
@@ -1195,6 +1189,15 @@
   // TRAININGSART WÄHLEN
   // ═══════════════════════════════════════════════════════
 
+  function updateExerciseScreenUI() {
+    const hasActive = !!state.currentExercise;
+    document.getElementById('exerciseScreenTitle').innerHTML = hasActive
+      ? `<span>${state.currentExercise}</span>`
+      : `<span>${state.type}</span> –<br>Übung wählen`;
+    document.getElementById('exerciseChangeLink').style.display = hasActive ? 'block' : 'none';
+    document.getElementById('exerciseButtons').style.display   = hasActive ? 'none'  : '';
+  }
+
   async function selectType(type) {
     state.type = type;
     state.currentExercise = null;
@@ -1202,13 +1205,11 @@
     state.completedExercises = [];
     saveSessionCache();
 
-    document.getElementById('exerciseScreenTitle').innerHTML =
-      `<span>${type}</span> –<br>Übung wählen`;
-
     // Eigene Übungen für diese Trainingsart laden
     await loadCustomExercises();
 
     renderExerciseButtons();
+    updateExerciseScreenUI();
     document.getElementById('setInputSection').style.display = 'none';
     document.getElementById('goSummaryBtn').style.display = 'none';
     document.getElementById('addExerciseForm').style.display = 'none';
@@ -1454,7 +1455,7 @@
       saveSessionCache();
     }
 
-    document.getElementById('currentExerciseName').textContent = name;
+    updateExerciseScreenUI();
     document.getElementById('setInputSection').style.display = 'flex';
     document.getElementById('finishExBtn').disabled = state.currentSets.length === 0;
 
@@ -1663,11 +1664,8 @@
   function finishExercise() {
     if (state.currentSets.length === 0) return;
 
-    state.completedExercises.push({
-      name: state.currentExercise,
-      sets: [...state.currentSets]
-    });
-
+    const lastEx = { name: state.currentExercise, sets: [...state.currentSets] };
+    state.completedExercises.push(lastEx);
     state.currentExercise = null;
     state.currentSets = [];
 
@@ -1675,8 +1673,8 @@
     document.getElementById('goSummaryBtn').style.display = 'block';
 
     renderExerciseButtons();
+    updateExerciseScreenUI();
 
-    const lastEx = state.completedExercises[state.completedExercises.length - 1];
     showToast(`✓ ${lastEx.name} abgeschlossen`, 'success');
   }
 
@@ -1684,7 +1682,9 @@
     state.currentExercise = null;
     state.currentSets = [];
     document.getElementById('setInputSection').style.display = 'none';
+    hideAddForm();
     renderExerciseButtons();
+    updateExerciseScreenUI();
   }
 
   // ═══════════════════════════════════════════════════════
