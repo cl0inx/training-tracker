@@ -385,6 +385,32 @@
   }
   .stats-nav-btn:active { transform: scale(0.96); }
 
+  /* ── MAIN NAVBAR ── */
+  .main-nav {
+    width: 100%; max-width: 480px;
+    padding: 6px 20px;
+    display: none; align-items: center;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .main-nav.visible { display: flex; }
+  .nav-left { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+  .nav-steps { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+  .nav-link {
+    background: none; border: none; color: var(--muted);
+    font-family: 'DM Sans', sans-serif; font-size: 0.78rem;
+    cursor: pointer; padding: 4px 0;
+    transition: color 0.2s; white-space: nowrap;
+  }
+  .nav-link:hover { color: var(--text); }
+  .nav-logout {
+    background: none; border: none; color: var(--accent2);
+    font-family: 'DM Sans', sans-serif; font-size: 0.78rem;
+    cursor: pointer; padding: 4px 0; flex-shrink: 0;
+    transition: opacity 0.2s; white-space: nowrap;
+  }
+  .nav-logout:hover { opacity: 0.75; }
+
   /* ── GIRLY THEME ── */
   body.theme-girly {
     --bg: #fff0f5;
@@ -466,6 +492,15 @@
   </div>
 </header>
 
+<nav id="mainNav" class="main-nav">
+  <div class="nav-left">
+    <div class="nav-steps" id="navSteps"></div>
+    <button id="navBackType" class="nav-link" onclick="backToType()" style="display:none;">← Trainingsart</button>
+    <button id="navBackExercise" class="nav-link" onclick="changeExercise()" style="display:none;">← Übung</button>
+  </div>
+  <button class="nav-logout" onclick="logoutUser()">Abmelden</button>
+</nav>
+
 
 <!-- SCREEN 0: Login -->
 <div class="screen active" id="screen-user">
@@ -524,13 +559,6 @@
 
 <!-- SCREEN 1: Trainingsart -->
 <div class="screen" id="screen-type">
-  <div class="steps">
-    <div class="step-dot done"></div>
-    <div class="step-dot active"></div>
-    <div class="step-dot"></div>
-    <div class="step-dot"></div>
-  </div>
-  <button class="btn-back" onclick="logoutUser()" style="color:var(--muted);">Abmelden</button>
   <div class="section-label">Was trainierst<br><span>du heute?</span></div>
   <div class="card-grid">
     <div class="type-card" onclick="selectType('Beine/Schultern')">
@@ -559,16 +587,7 @@
 
 <!-- SCREEN 2: Übung & Sätze -->
 <div class="screen" id="screen-exercise">
-  <div class="steps">
-    <div class="step-dot done"></div>
-    <div class="step-dot done"></div>
-    <div class="step-dot active"></div>
-    <div class="step-dot"></div>
-  </div>
   <div class="section-label" id="exerciseScreenTitle">Übung wählen</div>
-  <button class="btn-back" id="exerciseChangeLink" onclick="changeExercise()" style="display:none;">← Übung wechseln</button>
-
-  <button class="btn-back" onclick="backToType()">← Trainingsart wechseln</button>
 
   <div id="exerciseButtons"></div>
 
@@ -649,12 +668,6 @@
 
 <!-- SCREEN 3: Zusammenfassung -->
 <div class="screen" id="screen-summary">
-  <div class="steps">
-    <div class="step-dot done"></div>
-    <div class="step-dot done"></div>
-    <div class="step-dot done"></div>
-    <div class="step-dot active"></div>
-  </div>
   <div class="section-label">Training<br><span>Zusammenfassung</span></div>
 
   <div class="summary-block" id="summaryContent"></div>
@@ -1002,6 +1015,7 @@
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    updateNavbar(id);
   }
 
   // ═══════════════════════════════════════════════════════
@@ -1194,8 +1208,8 @@
     document.getElementById('exerciseScreenTitle').innerHTML = hasActive
       ? `<span>${state.currentExercise}</span>`
       : `<span>${state.type}</span> –<br>Übung wählen`;
-    document.getElementById('exerciseChangeLink').style.display = hasActive ? 'block' : 'none';
-    document.getElementById('exerciseButtons').style.display   = hasActive ? 'none'  : '';
+    document.getElementById('exerciseButtons').style.display   = hasActive ? 'none' : '';
+    document.getElementById('navBackExercise').style.display   = hasActive ? 'block' : 'none';
   }
 
   async function selectType(type) {
@@ -1748,6 +1762,7 @@
     document.getElementById('statsBtn').style.display    = 'none';
     document.getElementById('settingsBtn').style.display = 'none';
     document.getElementById('manualBtn').style.display   = 'none';
+    document.getElementById('mainNav').classList.remove('visible');
     showScreen('screen-user');
   }
 
@@ -2047,6 +2062,7 @@
     document.getElementById('statsBtn').style.display    = 'block';
     document.getElementById('settingsBtn').style.display = 'block';
     document.getElementById('manualBtn').style.display   = 'block';
+    document.getElementById('mainNav').classList.add('visible');
   }
 
   // ═══════════════════════════════════════════════════════
@@ -2246,9 +2262,28 @@
     document.getElementById('settingsOverlay').style.display = 'none';
   }
 
-  function logoutFromSettings() {
-    dismissSettingsModal();
-    logoutUser();
+  // ═══════════════════════════════════════════════════════
+  // NAVBAR
+  // ═══════════════════════════════════════════════════════
+
+  function updateNavbar(screenId) {
+    const stepMap = {
+      'screen-type':     ['done', 'active', '',       ''      ],
+      'screen-exercise': ['done', 'done',   'active', ''      ],
+      'screen-summary':  ['done', 'done',   'done',   'active'],
+      'screen-stats':    ['done', 'done',   'done',   'done'  ],
+      'screen-manual':   ['done', 'done',   'done',   'done'  ],
+    };
+    const dots = stepMap[screenId] || [];
+    document.getElementById('navSteps').innerHTML = dots
+      .map(c => `<div class="step-dot${c ? ' ' + c : ''}"></div>`)
+      .join('');
+
+    const onExercise = screenId === 'screen-exercise';
+    document.getElementById('navBackType').style.display =
+      onExercise ? 'block' : 'none';
+    document.getElementById('navBackExercise').style.display =
+      (onExercise && !!state.currentExercise) ? 'block' : 'none';
   }
 
   // ═══════════════════════════════════════════════════════
@@ -2339,7 +2374,6 @@
       </div>
     </div>
 
-    <button class="btn-danger" onclick="logoutFromSettings()">Abmelden</button>
     <button class="btn-secondary" onclick="dismissSettingsModal()">Schließen</button>
   </div>
 </div>
