@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="UTF-8">
@@ -760,7 +760,6 @@
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    console.log('saveSatz response:', data);
     return data[0]?.id || null;
   }
 
@@ -836,12 +835,6 @@
     `;
   }
 
-  // Kompatibilitätsfunktion – wird von preloadLastWeights gebraucht
-  // Wir laden jetzt keine Gewichte vor, sondern erst bei Übungsauswahl
-  async function loadLastWeight(uebungName) {
-    return null;
-  }
-
   // ── Verbindung testen ─────────────────────────────────
   async function testConnection() {
     try {
@@ -874,8 +867,6 @@
   // Kein hardcoded EXERCISES mehr – alles kommt aus Supabase
   // state.allExercises wird nach Login pro Trainingsart befüllt
 
-  let lastWeights = {};
-
   let state = {
     nutzer: null,
     token:  null,          // JWT Token von Supabase Auth
@@ -902,12 +893,6 @@
 
   // Beim Start: prüfen ob noch eine Session aktiv ist (auto-login)
   checkExistingSession();
-
-  // Letzte Gewichte für alle Übungen vorladen
-  // (damit sie sofort da sind wenn der Nutzer eine Übung wählt)
-  // Letzte Gewichte werden nicht mehr vorgeladen
-  // Stattdessen: letzte Session wird bei Übungsauswahl geladen (loadLastSession)
-  async function preloadLastWeights() { /* nicht mehr benötigt */ }
 
   // ═══════════════════════════════════════════════════════
   // SCREEN-NAVIGATION
@@ -982,9 +967,14 @@
 
   // Profil aus Supabase laden
   async function loadProfile() {
-    const res  = await fetch(`${SUPABASE_URL}/rest/v1/profile?select=name`, { headers });
-    const data = await res.json();
-    return data[0] || null;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/profile?select=name`, { headers });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data[0] || null;
+    } catch {
+      return null;
+    }
   }
 
   // Onboarding: Name speichern
@@ -1072,20 +1062,26 @@
   // Alle Übungen aus Supabase laden
   // RLS filtert automatisch nach eingeloggtem User – kein nutzer-Filter nötig
   async function loadAllExercises() {
-    const url = `${SUPABASE_URL}/rest/v1/uebungen`
-      + `?select=name,trainingsart`
-      + `&order=created_at.asc`;
+    try {
+      const url = `${SUPABASE_URL}/rest/v1/uebungen`
+        + `?select=name,trainingsart`
+        + `&order=created_at.asc`;
 
-    const res  = await fetch(url, { headers });
-    const data = await res.json();
+      const res = await fetch(url, { headers });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
 
-    state.allExercises = {};
-    data.forEach(row => {
-      if (!state.allExercises[row.trainingsart]) {
-        state.allExercises[row.trainingsart] = [];
-      }
-      state.allExercises[row.trainingsart].push(row.name);
-    });
+      state.allExercises = {};
+      data.forEach(row => {
+        if (!state.allExercises[row.trainingsart]) {
+          state.allExercises[row.trainingsart] = [];
+        }
+        state.allExercises[row.trainingsart].push(row.name);
+      });
+    } catch (err) {
+      console.error('Übungen laden fehlgeschlagen:', err);
+      showToast('Übungen konnten nicht geladen werden', 'error');
+    }
   }
 
   // ═══════════════════════════════════════════════════════
@@ -1130,7 +1126,6 @@
   // falls vorhanden ("Zuletzt: 80 kg × 8")
 
   function renderExerciseButtons() {
-    const standardUebungen = [];
     const container  = document.getElementById('exerciseButtons');
     // Übungen kommen jetzt komplett aus Supabase (state.allExercises)
     const exercises  = state.allExercises[state.type] || [];
@@ -1144,16 +1139,20 @@
       const btn = document.createElement('button');
       btn.className = 'exercise-btn' + (doneNames.includes(ex) ? ' selected' : '');
 
-      if (editMode && !standardUebungen.includes(ex)) {
+      if (editMode) {
         // Edit-Modus: Löschen-Button zeigen
         btn.style.display             = 'grid';
         btn.style.gridTemplateColumns = '1fr auto';
         btn.style.alignItems          = 'center';
-        btn.innerHTML = `
-          <span style="text-align:left">${ex}</span>
-          <span onclick="event.stopPropagation(); deleteExercise('${ex}')"
-                style="color:var(--accent2);font-size:1.1rem;padding:2px 6px;line-height:1;">✕</span>
-        `;
+        const nameSpan = document.createElement('span');
+        nameSpan.style.textAlign = 'left';
+        nameSpan.textContent = ex;
+        const delSpan = document.createElement('span');
+        delSpan.style.cssText = 'color:var(--accent2);font-size:1.1rem;padding:2px 6px;line-height:1;';
+        delSpan.textContent = '✕';
+        delSpan.onclick = (e) => { e.stopPropagation(); deleteExercise(ex); };
+        btn.appendChild(nameSpan);
+        btn.appendChild(delSpan);
       } else if (doneNames.includes(ex)) {
         // Übung bereits abgeschlossen
         btn.innerHTML = `✓ ${ex} <span style="color:var(--muted);font-size:0.8rem">(${state.completedExercises.find(e=>e.name===ex).sets.length} Sätze)</span>`;
@@ -1235,9 +1234,7 @@
 
   // Übung löschen
   async function deleteExercise(name) {
-    // Sicherheitsabfrage – window.confirm öffnet einen Browser-Dialog
-    // "Bist du sicher?" → OK = true, Abbrechen = false
-    const bestaetigt = window.confirm(`"${name}" wirklich löschen?`);
+    const bestaetigt = await showConfirm(`"${name}" wirklich löschen?`);
     if (!bestaetigt) return;
 
     try {
@@ -1437,6 +1434,7 @@
         const savedId = await saveSatz(satzData);
         satz.status = 'saved';
         satz.dbId   = savedId;
+        saveSessionCache();
       } catch (err) {
         console.error('Speichern fehlgeschlagen:', err);
         satz.status = 'error';
@@ -1486,12 +1484,6 @@
       satz.status = 'saved';
       satz.dbId   = savedId;
       saveSessionCache();
-
-      // lastWeights aktualisieren damit nächste Übung aktuell ist
-      lastWeights[state.currentExercise] = {
-        gewicht_kg:     parseFloat(weight),
-        wiederholungen: parseInt(reps)
-      };
 
     } catch (err) {
       console.error('Speichern fehlgeschlagen:', err);
@@ -1615,7 +1607,9 @@
       const div = document.createElement('div');
       div.className = 'summary-exercise';
       const setsText = ex.sets.map((s, i) =>
-        `Satz ${i+1}: ${s.weight}kg × ${s.reps}`
+        s.isCardio
+          ? `Satz ${i+1}: ${s.zeit} min × ${s.runden}`
+          : `Satz ${i+1}: ${s.weight}kg × ${s.reps}`
       ).join(' · ');
       div.innerHTML = `
         <div>
@@ -1634,8 +1628,7 @@
 
   function resetAll() {
     clearSessionCache();
-    state = { nutzer: null, token: null, type: null, currentExercise: null, currentSets: [], completedExercises: [], customExercises: [], allExercises: {} };
-    lastWeights = {};
+    state = { nutzer: null, token: null, userId: null, type: null, currentExercise: null, currentSets: [], completedExercises: [], customExercises: [], allExercises: {} };
     // Auth Header zurücksetzen
     headers['Authorization'] = `Bearer ${SUPABASE_KEY}`;
     // Login-Felder leeren
@@ -1701,6 +1694,12 @@
   document.getElementById('inputWeight').addEventListener('keydown', e => {
     if (e.key === 'Enter') document.getElementById('inputReps').focus();
   });
+  document.getElementById('inputZeit').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('inputRunden').focus();
+  });
+  document.getElementById('inputRunden').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addSet();
+  });
   document.getElementById('loginPassword').addEventListener('keydown', e => {
     if (e.key === 'Enter') loginWithEmail();
   });
@@ -1721,11 +1720,19 @@
   function showStats() {
     const select = document.getElementById('statsExerciseSelect');
     select.innerHTML = '<option value="">– Übung wählen –</option>';
-    Object.values(state.allExercises).flat().forEach(name => {
-      const opt = document.createElement('option');
-      opt.value = name;
-      opt.textContent = name;
-      select.appendChild(opt);
+    const arten = ['Beine/Schultern', 'Brust/Trizeps', 'Rücken/Bizeps', 'Cardio'];
+    arten.forEach(art => {
+      const uebungen = (state.allExercises[art] || []).slice().sort();
+      if (!uebungen.length) return;
+      const group = document.createElement('optgroup');
+      group.label = art;
+      uebungen.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        group.appendChild(opt);
+      });
+      select.appendChild(group);
     });
     showScreen('screen-stats');
   }
@@ -1752,7 +1759,7 @@
       + `?select=datum,${isCardio ? 'zeit_minuten,runden' : 'gewicht_kg,wiederholungen,satz'}`
       + `&uebung=eq.${encodeURIComponent(uebung)}`
       + `&datum=gte.${vonDatum}`
-      + `&order=datum.asc,satz.asc`;
+      + `&order=datum.asc${isCardio ? '' : ',satz.asc'}`;
 
     const res   = await fetch(url, { headers });
     const daten = await res.json();
@@ -1971,7 +1978,11 @@
   }
 
   function closeExportModal(e) {
-    if (e && e.target !== document.getElementById('exportOverlay')) return;
+    if (e.target !== document.getElementById('exportOverlay')) return;
+    document.getElementById('exportOverlay').style.display = 'none';
+  }
+
+  function dismissExportModal() {
     document.getElementById('exportOverlay').style.display = 'none';
   }
 
@@ -2070,83 +2081,6 @@
     }
   }
 
-  async function exportCSV(mode) {
-    const uebung = document.getElementById('statsExerciseSelect').value;
-    const isCurrentMode = mode === 'current';
-
-    // Bei "aktuelle Ansicht" muss eine Übung gewählt sein
-    if (isCurrentMode && !uebung) {
-      showToast('Bitte zuerst eine Übung wählen', 'error');
-      return;
-    }
-
-    showToast('Export wird vorbereitet…');
-
-    try {
-      let url, filename;
-
-      if (isCurrentMode) {
-        // Nur gewählte Übung + gewählter Zeitraum
-        const isCardio = ['Seilspringen', 'Laufen', 'Fahrrad'].some(c => uebung.includes(c));
-        const vonDatum = statsPeriodDays === 9999
-          ? '2000-01-01'
-          : new Date(Date.now() - statsPeriodDays * 86400000).toISOString().split('T')[0];
-
-        url = `${SUPABASE_URL}/rest/v1/${TABLE}`
-          + `?select=datum,uhrzeit,trainingsart,uebung,satz,gewicht_kg,wiederholungen,zeit_minuten,runden`
-          + `&uebung=eq.${encodeURIComponent(uebung)}`
-          + `&datum=gte.${vonDatum}`
-          + `&order=datum.asc,satz.asc`;
-
-        const periodeText = statsPeriodDays === 9999 ? 'Alles' : `${statsPeriodDays}Tage`;
-        filename = `${uebung}_${periodeText}.csv`;
-      } else {
-        // Alle Daten
-        url = `${SUPABASE_URL}/rest/v1/${TABLE}`
-          + `?select=datum,uhrzeit,trainingsart,uebung,satz,gewicht_kg,wiederholungen,zeit_minuten,runden`
-          + `&order=datum.asc,uebung.asc,satz.asc`;
-        filename = `Training_Export_${new Date().toISOString().split('T')[0]}.csv`;
-      }
-
-      const res  = await fetch(url, { headers });
-      const data = await res.json();
-
-      if (!data.length) {
-        showToast('Keine Daten gefunden', 'error');
-        return;
-      }
-
-      // JSON → CSV konvertieren
-      const cols = ['datum','uhrzeit','trainingsart','uebung','satz','gewicht_kg','wiederholungen','zeit_minuten','runden'];
-      const header = ['Datum','Uhrzeit','Trainingsart','Übung','Satz','Gewicht (kg)','Wiederholungen','Zeit (min)','Runden'];
-
-      const rows = data.map(row =>
-        cols.map(c => {
-          const val = row[c] ?? '';
-          // Kommas und Anführungszeichen escapen
-          return typeof val === 'string' && (val.includes(',') || val.includes('"'))
-            ? `"${val.replace(/"/g, '""')}"`
-            : val;
-        }).join(';')   // Semikolon für deutsches Excel
-      );
-
-      const csv = '\uFEFF' + header.join(';') + '\n' + rows.join('\n');  // BOM für Excel-Kompatibilität
-
-      // Download triggern
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href     = URL.createObjectURL(blob);
-      link.download = filename;
-      link.click();
-      URL.revokeObjectURL(link.href);
-
-      showToast(`✓ ${data.length} Zeilen exportiert`, 'success');
-
-    } catch(err) {
-      console.error('Export fehlgeschlagen:', err);
-      showToast('Export fehlgeschlagen', 'error');
-    }
-  }
 
 </script>
 
@@ -2193,7 +2127,7 @@
 
     <!-- Buttons -->
     <div class="btn-row">
-      <button class="btn-secondary" onclick="closeExportModal()">Abbrechen</button>
+      <button class="btn-secondary" onclick="dismissExportModal()">Abbrechen</button>
       <button class="btn-primary" onclick="runExport()">↓ Exportieren</button>
     </div>
   </div>
