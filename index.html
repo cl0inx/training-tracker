@@ -618,11 +618,11 @@
       <div class="input-row">
         <div class="input-group">
           <label>Gewicht (kg)</label>
-          <input type="number" id="inputWeight" placeholder="80" min="0" step="0.5" inputmode="decimal">
+          <input type="number" id="inputWeight" min="0" step="0.5" inputmode="decimal">
         </div>
         <div class="input-group">
           <label>Wiederholungen</label>
-          <input type="number" id="inputReps" placeholder="10" min="1" inputmode="numeric">
+          <input type="number" id="inputReps" min="1" inputmode="numeric">
         </div>
       </div>
     </div>
@@ -947,6 +947,23 @@
     `;
   }
 
+  // Füllt Gewicht/Wdh (oder Zeit/Runden) mit satzgenauem Wert aus dem letzten Training vor
+  function prefillInputs() {
+    if (!state.lastSession || !state.lastSession.saetze.length) return;
+    const saetze       = state.lastSession.saetze;
+    const naechsterSatz = state.currentSets.length + 1;
+    // Exakter Satz oder Fallback auf den letzten vorhandenen Satz
+    const ref = saetze.find(s => s.satz === naechsterSatz) || saetze[saetze.length - 1];
+    if (!ref) return;
+    if (state.type === 'Cardio') {
+      if (ref.zeit_minuten != null) document.getElementById('inputZeit').value   = ref.zeit_minuten;
+      if (ref.runden       != null) document.getElementById('inputRunden').value = ref.runden;
+    } else {
+      if (ref.gewicht_kg    != null) document.getElementById('inputWeight').value = ref.gewicht_kg;
+      if (ref.wiederholungen != null) document.getElementById('inputReps').value  = ref.wiederholungen;
+    }
+  }
+
   // ── Verbindung testen ─────────────────────────────────
   async function testConnection() {
     try {
@@ -989,7 +1006,8 @@
     currentSets: [],
     completedExercises: [],
     customExercises: [],
-    allExercises: {}
+    allExercises: {},
+    lastSession: null
   };
 
   // Heutiges Datum als ISO-String (2026-03-27) für die Datenbank
@@ -1504,7 +1522,9 @@
     const box = document.getElementById('lastSessionBox');
     box.innerHTML = '<div style="font-size:0.78rem;color:var(--muted);padding:4px 0">⏳ Lade letztes Training...</div>';
     const session = await loadLastSession(name);
+    state.lastSession = session;
     renderLastSession(session);
+    prefillInputs();
 
     renderExerciseButtons();
 
@@ -1539,6 +1559,7 @@
       document.getElementById('finishExBtn').disabled = false;
       document.getElementById('inputZeit').value   = '';
       document.getElementById('inputRunden').value = '';
+      prefillInputs();
       document.getElementById('inputZeit').focus();
 
       const satzData = {
@@ -1586,8 +1607,10 @@
 
     renderSetsLog();
     document.getElementById('finishExBtn').disabled = false;
-    document.getElementById('inputReps').value = '';
-    document.getElementById('inputReps').focus();
+    document.getElementById('inputWeight').value = '';
+    document.getElementById('inputReps').value   = '';
+    prefillInputs();
+    document.getElementById('inputWeight').focus();
 
     const satzData = {
       datum:          datumWert,
@@ -1694,7 +1717,8 @@
 
   function changeExercise() {
     state.currentExercise = null;
-    state.currentSets = [];
+    state.currentSets     = [];
+    state.lastSession     = null;
     document.getElementById('setInputSection').style.display = 'none';
     hideAddForm();
     renderExerciseButtons();
@@ -1750,7 +1774,7 @@
   function resetAll() {
     clearSessionCache();
     const currentTheme = state.theme;
-    state = { nutzer: null, token: null, userId: null, theme: currentTheme, type: null, currentExercise: null, currentSets: [], completedExercises: [], customExercises: [], allExercises: {} };
+    state = { nutzer: null, token: null, userId: null, theme: currentTheme, type: null, currentExercise: null, currentSets: [], completedExercises: [], customExercises: [], allExercises: {}, lastSession: null };
     // Auth Header zurücksetzen
     headers['Authorization'] = `Bearer ${SUPABASE_KEY}`;
     // Login-Felder leeren
