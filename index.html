@@ -655,11 +655,21 @@
 
     <button class="btn-primary" onclick="addSet()">+ Satz hinzufügen</button>
 
-    <button class="btn-secondary" id="finishExBtn" onclick="finishExercise()" disabled>Übung fertig ✓</button>
+    <!-- Notiz zur aktuellen Übung -->
+    <div class="input-group">
+      <label>Notiz zur Übung (optional)</label>
+      <textarea id="inputNotiz" rows="2"
+        style="font-size:1rem;padding:14px;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;color:var(--text);width:100%;outline:none;resize:vertical;font-family:'DM Sans',sans-serif;box-sizing:border-box;"></textarea>
+    </div>
+
+    <div style="display:flex;gap:10px;">
+      <button class="btn-secondary" id="finishExBtn" onclick="finishExercise()" disabled style="flex:1">Übung fertig ✓</button>
+      <button class="btn-secondary" id="goSummaryBtn" onclick="confirmGoToSummary()" style="display:none;flex:1">Training abschließen →</button>
+    </div>
   </div>
 
   <div id="noExerciseYet" style="padding: 8px 0;">
-    <button class="btn-secondary" onclick="goToSummary()" id="goSummaryBtn" style="display:none">
+    <button class="btn-secondary" onclick="confirmGoToSummary()" id="goSummaryBtnIdle" style="display:none">
       Training abschließen →
     </button>
   </div>
@@ -898,7 +908,7 @@
 
     // Schritt 2: alle Sätze dieses Datums laden, sortiert nach Satznummer
     const urlSaetze = `${SUPABASE_URL}/rest/v1/${TABLE}`
-      + `?select=satz,gewicht_kg,wiederholungen,zeit_minuten,runden`
+      + `?select=satz,gewicht_kg,wiederholungen,zeit_minuten,runden,notiz`
       + `&uebung=eq.${encodeURIComponent(uebungName)}`
       + `&datum=eq.${letztesDatum}`
       + `&order=satz.asc`;
@@ -936,6 +946,11 @@
       `;
     }).join('');
     
+    const letzteNotiz = sessionData.saetze[0]?.notiz;
+    const notizZeile  = letzteNotiz
+      ? `<div class="last-session-row" style="grid-column:1/-1;font-style:italic;color:var(--muted);font-size:0.82rem;">💬 ${letzteNotiz}</div>`
+      : '';
+
     box.innerHTML = `
       <div class="last-session">
         <div class="last-session-header">
@@ -943,6 +958,7 @@
           <span class="ex-date">${datumDE}</span>
         </div>
         ${zeilen}
+        ${notizZeile}
       </div>
     `;
   }
@@ -1242,9 +1258,10 @@
 
     renderExerciseButtons();
     updateExerciseScreenUI();
-    document.getElementById('setInputSection').style.display = 'none';
-    document.getElementById('goSummaryBtn').style.display = 'none';
-    document.getElementById('addExerciseForm').style.display = 'none';
+    document.getElementById('setInputSection').style.display  = 'none';
+    document.getElementById('goSummaryBtn').style.display     = 'none';
+    document.getElementById('goSummaryBtnIdle').style.display = 'none';
+    document.getElementById('addExerciseForm').style.display  = 'none';
     showScreen('screen-exercise');
   }
 
@@ -1517,6 +1534,11 @@
     document.getElementById('inputReps').value   = '';
     document.getElementById('inputZeit').value   = '';
     document.getElementById('inputRunden').value = '';
+    document.getElementById('inputNotiz').value  = '';
+
+    // "Training abschließen" nur zeigen, wenn bereits Übungen abgeschlossen sind
+    document.getElementById('goSummaryBtn').style.display =
+      state.completedExercises.length > 0 ? 'block' : 'none';
 
     // Letzte Session laden
     const box = document.getElementById('lastSessionBox');
@@ -1544,6 +1566,7 @@
   async function addSet() {
     const isCardio   = state.type === 'Cardio';
     const datumWert  = document.getElementById('inputDatum').value || todayISO;
+    const notizWert  = document.getElementById('inputNotiz').value.trim() || null;
 
     // Validierung je nach Trainingsart
     if (isCardio) {
@@ -1570,6 +1593,7 @@
         satz:           satzNummer,
         zeit_minuten:   parseFloat(zeit),
         runden:         parseInt(runden) || 1,
+        notiz:          notizWert,
         // nutzer wird automatisch vom Supabase Trigger gesetzt
       };
 
@@ -1620,6 +1644,7 @@
       satz:           satzNummer,
       gewicht_kg:     parseFloat(weight),
       wiederholungen: parseInt(reps),
+      notiz:          notizWert,
       // nutzer wird automatisch vom Supabase Trigger gesetzt
     };
 
@@ -1706,8 +1731,10 @@
     state.currentExercise = null;
     state.currentSets = [];
 
+    document.getElementById('inputNotiz').value              = '';
+    document.getElementById('goSummaryBtn').style.display    = 'none';
     document.getElementById('setInputSection').style.display = 'none';
-    document.getElementById('goSummaryBtn').style.display = 'block';
+    document.getElementById('goSummaryBtnIdle').style.display = 'block';
 
     renderExerciseButtons();
     updateExerciseScreenUI();
@@ -1719,6 +1746,8 @@
     state.currentExercise = null;
     state.currentSets     = [];
     state.lastSession     = null;
+    document.getElementById('inputNotiz').value          = '';
+    document.getElementById('goSummaryBtn').style.display = 'none';
     document.getElementById('setInputSection').style.display = 'none';
     hideAddForm();
     renderExerciseButtons();
@@ -1728,6 +1757,17 @@
   // ═══════════════════════════════════════════════════════
   // ZUSAMMENFASSUNG
   // ═══════════════════════════════════════════════════════
+
+  async function confirmGoToSummary() {
+    if (state.completedExercises.length === 0) {
+      showToast('Noch keine Übungen abgeschlossen', 'error');
+      return;
+    }
+    const ok = await showConfirm('Training wirklich abschließen?');
+    if (!ok) return;
+    renderSummary();
+    showScreen('screen-summary');
+  }
 
   function goToSummary() {
     if (state.completedExercises.length === 0) {
