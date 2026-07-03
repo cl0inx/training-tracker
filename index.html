@@ -411,6 +411,15 @@
   }
   .nav-logout:hover { opacity: 0.75; }
 
+  /* ── TOGGLE SWITCH ── */
+  .toggle-switch { position:relative; display:inline-block; width:44px; height:24px; flex-shrink:0; }
+  .toggle-switch input { opacity:0; width:0; height:0; }
+  .toggle-slider { position:absolute; cursor:pointer; inset:0; background:var(--border); border-radius:24px; transition:0.2s; }
+  .toggle-slider::before { content:''; position:absolute; width:18px; height:18px; left:3px; bottom:3px; background:white; border-radius:50%; transition:0.2s; }
+  .toggle-switch input:checked + .toggle-slider { background:var(--accent); }
+  .toggle-switch input:checked + .toggle-slider::before { transform:translateX(20px); }
+  .settings-row { display:flex; justify-content:space-between; align-items:center; font-size:0.9rem; color:var(--text); padding:4px 0; }
+
   /* ── GIRLY THEME ── */
   body.theme-girly {
     --bg: #fff0f5;
@@ -612,6 +621,15 @@
 
     <!-- Letzte Session wird hier per JS eingefügt -->
     <div id="lastSessionBox"></div>
+
+    <!-- DP-Ausnahme-Toggle (nur sichtbar wenn DP aktiv) -->
+    <div id="dpExceptionRow" style="display:none; justify-content:space-between; align-items:center; padding:2px 0;">
+      <span style="font-size:0.82rem; color:var(--muted);">DP für diese Übung aus</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="dpExceptionToggle" onchange="toggleDPException()">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
 
     <!-- Kraft-Eingabe (standard) -->
     <div id="kraftInputs">
@@ -963,17 +981,33 @@
     `;
   }
 
-  // Füllt Gewicht/Wdh (oder Zeit/Runden) mit satzgenauem Wert aus dem letzten Training vor
+  // Füllt Gewicht/Wdh (oder Zeit/Runden) mit satzgenauem Wert aus dem letzten Training vor.
+  // Im Double-Progression-Modus wird stattdessen die nächste Progression berechnet.
   function prefillInputs() {
     if (!state.lastSession || !state.lastSession.saetze.length) return;
-    const saetze       = state.lastSession.saetze;
+    const saetze        = state.lastSession.saetze;
     const naechsterSatz = state.currentSets.length + 1;
-    // Exakter Satz oder Fallback auf den letzten vorhandenen Satz
     const ref = saetze.find(s => s.satz === naechsterSatz) || saetze[saetze.length - 1];
     if (!ref) return;
+
     if (state.type === 'Cardio') {
       if (ref.zeit_minuten != null) document.getElementById('inputZeit').value   = ref.zeit_minuten;
       if (ref.runden       != null) document.getElementById('inputRunden').value = ref.runden;
+      return;
+    }
+
+    const dpAktiv = state.dp.aktiv && !state.dp.ausnahmen.includes(state.currentExercise);
+    if (dpAktiv) {
+      const alleMaxErreicht = saetze.every(s => (s.wiederholungen ?? 0) >= state.dp.maxWdh);
+      if (alleMaxErreicht) {
+        // Alle Sätze haben Obergrenze erreicht → Gewicht +2,5 kg, Wdh auf Minimum
+        document.getElementById('inputWeight').value = (ref.gewicht_kg || 0) + 2.5;
+        document.getElementById('inputReps').value   = state.dp.minWdh;
+      } else {
+        // Satzgenaue Wdh +1, maximal dp_maxWdh
+        document.getElementById('inputWeight').value = ref.gewicht_kg ?? '';
+        document.getElementById('inputReps').value   = Math.min((ref.wiederholungen ?? 0) + 1, state.dp.maxWdh);
+      }
     } else {
       if (ref.gewicht_kg    != null) document.getElementById('inputWeight').value = ref.gewicht_kg;
       if (ref.wiederholungen != null) document.getElementById('inputReps').value  = ref.wiederholungen;
@@ -1023,7 +1057,8 @@
     completedExercises: [],
     customExercises: [],
     allExercises: {},
-    lastSession: null
+    lastSession: null,
+    dp: { aktiv: false, minWdh: 8, maxWdh: 12, ausnahmen: [] }
   };
 
   // Heutiges Datum als ISO-String (2026-03-27) für die Datenbank
@@ -1109,6 +1144,14 @@
       return;
     }
 
+    // DP-Einstellungen aus Profil laden
+    state.dp = {
+      aktiv:    profil.dp_aktiv    ?? false,
+      minWdh:   profil.dp_min_wdh  ?? 8,
+      maxWdh:   profil.dp_max_wdh  ?? 12,
+      ausnahmen: profil.dp_ausnahmen ?? []
+    };
+
     // Profil vorhanden → Name setzen und weitermachen
     await finishLogin(profil.name, profil.theme || 'dark');
   }
@@ -1116,7 +1159,7 @@
   // Profil aus Supabase laden
   async function loadProfile() {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/profile?select=name,theme`, { headers });
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/profile?select=name,theme,dp_aktiv,dp_min_wdh,dp_max_wdh,dp_ausnahmen`, { headers });
       if (!res.ok) return null;
       const data = await res.json();
       return data[0] || null;
@@ -1422,12 +1465,14 @@
       showToast('Fehler beim Löschen', 'error');
     }
   }
-  function showConfirm(msg) {
+  function showConfirm(msg, buttonLabel = 'Löschen') {
     return new Promise(resolve => {
       document.getElementById('confirmMsg').textContent = msg;
-      document.getElementById('confirmOverlay').style.display = 'flex';
       const yes = document.getElementById('confirmYes');
-      const no  = document.getElementById('confirmNo');
+      yes.textContent  = buttonLabel;
+      yes.className    = buttonLabel === 'Löschen' ? 'btn-danger' : 'btn-primary';
+      document.getElementById('confirmOverlay').style.display = 'flex';
+      const no = document.getElementById('confirmNo');
       const cleanup = (result) => {
         document.getElementById('confirmOverlay').style.display = 'none';
         yes.replaceWith(yes.cloneNode(true));
@@ -1539,6 +1584,13 @@
     // "Training abschließen" nur zeigen, wenn bereits Übungen abgeschlossen sind
     document.getElementById('goSummaryBtn').style.display =
       state.completedExercises.length > 0 ? 'block' : 'none';
+
+    // DP-Ausnahme-Toggle: nur bei aktivem DP und Kraft-Training
+    const dpVerfuegbar = state.dp.aktiv && state.type !== 'Cardio';
+    document.getElementById('dpExceptionRow').style.display = dpVerfuegbar ? 'flex' : 'none';
+    if (dpVerfuegbar) {
+      document.getElementById('dpExceptionToggle').checked = state.dp.ausnahmen.includes(name);
+    }
 
     // Letzte Session laden
     const box = document.getElementById('lastSessionBox');
@@ -1763,7 +1815,7 @@
       showToast('Noch keine Übungen abgeschlossen', 'error');
       return;
     }
-    const ok = await showConfirm('Training wirklich abschließen?');
+    const ok = await showConfirm('Training wirklich abschließen?', 'Abschließen');
     if (!ok) return;
     renderSummary();
     showScreen('screen-summary');
@@ -1814,7 +1866,7 @@
   function resetAll() {
     clearSessionCache();
     const currentTheme = state.theme;
-    state = { nutzer: null, token: null, userId: null, theme: currentTheme, type: null, currentExercise: null, currentSets: [], completedExercises: [], customExercises: [], allExercises: {}, lastSession: null };
+    state = { nutzer: null, token: null, userId: null, theme: currentTheme, type: null, currentExercise: null, currentSets: [], completedExercises: [], customExercises: [], allExercises: {}, lastSession: null, dp: { aktiv: false, minWdh: 8, maxWdh: 12, ausnahmen: [] } };
     // Auth Header zurücksetzen
     headers['Authorization'] = `Bearer ${SUPABASE_KEY}`;
     // Login-Felder leeren
@@ -2314,6 +2366,7 @@
 
   function showSettingsModal() {
     renderThemeCards();
+    renderDPSettings();
     document.getElementById('settingsOverlay').style.display = 'flex';
   }
 
@@ -2329,6 +2382,68 @@
   // ═══════════════════════════════════════════════════════
   // NAVBAR
   // ═══════════════════════════════════════════════════════
+
+  // ═══════════════════════════════════════════════════════
+  // DOUBLE PROGRESSION
+  // ═══════════════════════════════════════════════════════
+
+  async function toggleDPException() {
+    const name    = state.currentExercise;
+    const checked = document.getElementById('dpExceptionToggle').checked;
+    if (checked) {
+      if (!state.dp.ausnahmen.includes(name)) state.dp.ausnahmen.push(name);
+    } else {
+      state.dp.ausnahmen = state.dp.ausnahmen.filter(e => e !== name);
+    }
+    prefillInputs();
+    await saveDPProfile();
+  }
+
+  async function saveDPProfile() {
+    try {
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/profile?id=eq.${state.userId}`,
+        {
+          method:  'PATCH',
+          headers: { ...headers, 'Prefer': 'return=minimal' },
+          body:    JSON.stringify({
+            dp_aktiv:     state.dp.aktiv,
+            dp_min_wdh:   state.dp.minWdh,
+            dp_max_wdh:   state.dp.maxWdh,
+            dp_ausnahmen: state.dp.ausnahmen
+          })
+        }
+      );
+    } catch (err) {
+      console.error('DP speichern fehlgeschlagen:', err);
+    }
+  }
+
+  function renderDPSettings() {
+    document.getElementById('dpToggle').checked           = state.dp.aktiv;
+    document.getElementById('dpMinWdh').value             = state.dp.minWdh;
+    document.getElementById('dpMaxWdh').value             = state.dp.maxWdh;
+    document.getElementById('dpSettingsFields').style.display = state.dp.aktiv ? 'block' : 'none';
+  }
+
+  async function toggleDP() {
+    state.dp.aktiv = document.getElementById('dpToggle').checked;
+    document.getElementById('dpSettingsFields').style.display = state.dp.aktiv ? 'block' : 'none';
+    // Ausnahme-Toggle im Exercise-Screen sofort aktualisieren
+    if (state.currentExercise) {
+      const dpVerfuegbar = state.dp.aktiv && state.type !== 'Cardio';
+      document.getElementById('dpExceptionRow').style.display = dpVerfuegbar ? 'flex' : 'none';
+    }
+    await saveDPProfile();
+  }
+
+  let dpSaveTimer = null;
+  function saveDPSettings() {
+    state.dp.minWdh = parseInt(document.getElementById('dpMinWdh').value) || 8;
+    state.dp.maxWdh = parseInt(document.getElementById('dpMaxWdh').value) || 12;
+    clearTimeout(dpSaveTimer);
+    dpSaveTimer = setTimeout(saveDPProfile, 800);
+  }
 
   function updateNavbar(screenId) {
     const stepMap = {
@@ -2438,6 +2553,31 @@
       </div>
     </div>
 
+    <div style="border-top:1px solid var(--border); padding-top:16px;">
+      <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Training</div>
+
+      <div class="settings-row">
+        <span>Double Progression</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="dpToggle" onchange="toggleDP()">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div id="dpSettingsFields" style="display:none; margin-top:12px;">
+        <div class="input-row">
+          <div class="input-group">
+            <label>Min. Wdh.</label>
+            <input type="number" id="dpMinWdh" min="1" max="30" inputmode="numeric" oninput="saveDPSettings()">
+          </div>
+          <div class="input-group">
+            <label>Max. Wdh.</label>
+            <input type="number" id="dpMaxWdh" min="1" max="30" inputmode="numeric" oninput="saveDPSettings()">
+          </div>
+        </div>
+      </div>
+    </div>
+
     <button class="btn-secondary" onclick="dismissSettingsModal()">Schließen</button>
   </div>
 </div>
@@ -2448,7 +2588,7 @@
     <div class="confirm-msg" id="confirmMsg"></div>
     <div class="btn-row">
       <button class="btn-secondary" id="confirmNo">Abbrechen</button>
-      <button class="btn-danger"    id="confirmYes">Löschen</button>
+      <button id="confirmYes">Löschen</button>
     </div>
   </div>
 </div>
