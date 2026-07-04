@@ -1382,22 +1382,7 @@
     alleCard.onclick = openAllExercises;
     container.appendChild(alleCard);
 
-    // 2. Muskelgruppen-Karten (sortiert nach MG_ORDER)
-    const allKeys  = Object.keys(state.allExercises);
-    const ordered  = [...MG_ORDER.filter(k => allKeys.includes(k)), ...allKeys.filter(k => !MG_ORDER.includes(k))];
-    ordered.forEach(mg => {
-      const count = (state.allExercises[mg] || []).length;
-      const card  = document.createElement('div');
-      card.className = 'type-card';
-      const icon = document.createElement('div'); icon.className = 'icon'; icon.textContent = MG_ICONS[mg] || '🔧';
-      const name = document.createElement('div'); name.className = 'name'; name.textContent = mg;
-      const sub  = document.createElement('div'); sub.className  = 'sub';  sub.textContent  = count + ' Übungen';
-      card.appendChild(icon); card.appendChild(name); card.appendChild(sub);
-      card.onclick = () => selectType(mg);
-      container.appendChild(card);
-    });
-
-    // 3. Pläne
+    // 2. Pläne oder Leer-Zustand
     if (plans.length) {
       const sep = document.createElement('div');
       sep.style.cssText = 'font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:8px 0 4px;';
@@ -1425,9 +1410,14 @@
         card.onclick = () => selectPlan(plan.id, plan.name);
         container.appendChild(card);
       });
+    } else {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'text-align:center;padding:32px 16px;color:var(--muted);font-size:0.9rem;line-height:1.6;';
+      empty.innerHTML = '<div style="font-size:2rem;margin-bottom:8px;">🗓️</div>Noch kein Trainingsplan –<br>erstelle deinen ersten Plan';
+      container.appendChild(empty);
     }
 
-    // 4. "+ Neuer Trainingsplan" Button
+    // 3. "+ Neuer Trainingsplan" Button
     const newBtn = document.createElement('button');
     newBtn.className = 'btn-secondary';
     newBtn.style.borderStyle = 'dashed';
