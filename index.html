@@ -915,7 +915,7 @@
 
   // Die Tabellen in die wir schreiben (müssen in Supabase existieren)
   const TABLE       = 'training';
-  const PLANS_URL   = `${SUPABASE_URL}/rest/v1/trainingspl%C3%A4ne`;
+  const PLANS_URL   = `${SUPABASE_URL}/rest/v1/trainingsplaene`;
   const PUE_URL     = `${SUPABASE_URL}/rest/v1/plan_uebungen`;
 
    // Supabase Client initialisieren (nutzt die JS SDK)
@@ -2753,7 +2753,7 @@
     if (!checked.length) { showToast('Bitte mindestens eine Übung wählen', 'error'); return; }
 
     try {
-      // 1. Plan in trainingspläne anlegen
+      // 1. Plan in trainingsplaene anlegen
       const planRes = await fetch(PLANS_URL, {
         method:  'POST',
         headers: { ...headers, 'Prefer': 'return=representation' },
