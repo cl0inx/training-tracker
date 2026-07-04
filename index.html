@@ -411,6 +411,50 @@
   }
   .nav-logout:hover { opacity: 0.75; }
 
+  /* ── TYPE SCREEN DYNAMIK ── */
+  .type-card-full {
+    background: var(--surface); border: 1.5px solid var(--accent);
+    border-radius: var(--radius); padding: 18px 16px; cursor: pointer;
+    display: flex; align-items: center; gap: 14px;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .type-card-full:active { transform: scale(0.97); }
+  .type-card-full:hover  { background: #1e2200; }
+  .type-card-full .icon  { font-size: 1.5rem; }
+  .type-card-full .name  { font-weight: 600; font-size: 1rem; }
+  .type-card-full .sub   { font-size: 0.75rem; color: var(--muted); }
+
+  .plan-card {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center;
+    transition: border-color 0.2s, background 0.2s, transform 0.1s;
+  }
+  .plan-card:active { transform: scale(0.97); }
+  .plan-card:hover  { border-color: var(--accent); background: #1e2200; }
+  .plan-card .plan-name { font-weight: 600; font-size: 0.95rem; }
+  .plan-card .plan-sub  { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+
+  /* Aufklappbare Muskelgruppen-Sektionen */
+  .mg-section { border: 1.5px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .mg-section + .mg-section { margin-top: 8px; }
+  .mg-section-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 16px; cursor: pointer; background: var(--surface); user-select: none;
+  }
+  .mg-section-header:hover { background: #1e2200; }
+  .mg-title { font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; }
+  .mg-count { font-size: 0.75rem; color: var(--muted); }
+  .mg-section-body { padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .mg-section-body.hidden { display: none; }
+  .mg-chevron { font-size: 0.7rem; color: var(--muted); transition: transform 0.2s; }
+  .mg-section-header.open .mg-chevron { transform: rotate(90deg); }
+
+  /* Drag & Drop (Plan-Ausführung) */
+  .exercise-row { display: flex; align-items: center; gap: 8px; }
+  .drag-handle  { font-size: 1.2rem; color: var(--muted); cursor: grab; padding: 0 2px; user-select: none; flex-shrink: 0; }
+  .exercise-row.drag-over > .exercise-btn { border-top: 2px solid var(--accent); }
+
   /* ── TOGGLE SWITCH ── */
   .toggle-switch { position:relative; display:inline-block; width:44px; height:24px; flex-shrink:0; }
   .toggle-switch input { opacity:0; width:0; height:0; }
@@ -504,8 +548,9 @@
 <nav id="mainNav" class="main-nav">
   <div class="nav-left">
     <div class="nav-steps" id="navSteps"></div>
-    <button id="navBackType" class="nav-link" onclick="backToType()" style="display:none;">← Trainingsart</button>
-    <button id="navBackExercise" class="nav-link" onclick="changeExercise()" style="display:none;">← Übung</button>
+    <button id="navBackMain"     class="nav-link" onclick="backToMain()"       style="display:none;">← Übersicht</button>
+    <button id="navBackType"     class="nav-link" onclick="backToType()"       style="display:none;">← Trainingsart</button>
+    <button id="navBackExercise" class="nav-link" onclick="changeExercise()"   style="display:none;">← Übung</button>
   </div>
   <button class="nav-logout" onclick="logoutUser()">Abmelden</button>
 </nav>
@@ -566,30 +611,38 @@
 </div>
 
 
-<!-- SCREEN 1: Trainingsart -->
+<!-- SCREEN 1: Trainingsart (dynamisch per JS befüllt) -->
 <div class="screen" id="screen-type">
   <div class="section-label">Was trainierst<br><span>du heute?</span></div>
-  <div class="card-grid">
-    <div class="type-card" onclick="selectType('Beine/Schultern')">
-      <div class="icon">🦵</div>
-      <div class="name">Beine / Schultern</div>
-      <div class="sub" id="count-Beine/Schultern">Lädt...</div>
-    </div>
-    <div class="type-card" onclick="selectType('Brust/Trizeps')">
-      <div class="icon">💪</div>
-      <div class="name">Brust / Trizeps</div>
-      <div class="sub" id="count-Brust/Trizeps">Lädt...</div>
-    </div>
-    <div class="type-card" onclick="selectType('Rücken/Bizeps')">
-      <div class="icon">🏋️</div>
-      <div class="name">Rücken / Bizeps</div>
-      <div class="sub" id="count-Rücken/Bizeps">Lädt...</div>
-    </div>
-    <div class="type-card" onclick="selectType('Cardio')">
-      <div class="icon">🏃</div>
-      <div class="name">Cardio</div>
-      <div class="sub" id="count-Cardio">Lädt...</div>
-    </div>
+  <div id="typeCardsContainer" class="card-grid">
+    <div style="font-size:0.85rem;color:var(--muted);text-align:center;padding:20px 0">Lädt...</div>
+  </div>
+</div>
+
+
+<!-- SCREEN 1b: Alle Übungen -->
+<div class="screen" id="screen-alle">
+  <div class="section-label">Alle<br><span>Übungen</span></div>
+  <div id="alleUebungenContainer" style="display:flex;flex-direction:column;gap:0;"></div>
+</div>
+
+
+<!-- SCREEN 1c: Trainingsplan erstellen -->
+<div class="screen" id="screen-plan-erstellen">
+  <div class="section-label">Neuer<br><span>Trainingsplan</span></div>
+
+  <div class="input-group">
+    <label>Planname</label>
+    <input type="text" id="planName" placeholder="z.B. Push Day A"
+      style="font-size:1rem;padding:14px;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;color:var(--text);width:100%;outline:none;">
+  </div>
+
+  <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:4px 0 8px">Übungen wählen</div>
+  <div id="planUebungenPicker"></div>
+
+  <div style="display:flex;gap:10px;margin-top:4px;">
+    <button class="btn-secondary" onclick="showScreen('screen-type')" style="flex:1">Abbrechen</button>
+    <button class="btn-primary"   onclick="saveNewPlan()"             style="flex:1">Plan speichern →</button>
   </div>
 </div>
 
@@ -604,6 +657,18 @@
   <div id="addExerciseForm" class="add-exercise-form" style="display:none;">
     <label>Neue Übung</label>
     <input type="text" id="newExerciseName" placeholder="z.B. Bulgarian Split Squats">
+    <label style="margin-top:4px;">Muskelgruppe</label>
+    <select id="newExerciseMg"
+      style="font-size:1rem;padding:12px 14px;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;color:var(--text);width:100%;outline:none;">
+      <option value="Beine">Beine</option>
+      <option value="Schultern">Schultern</option>
+      <option value="Brust">Brust</option>
+      <option value="Trizeps">Trizeps</option>
+      <option value="Rücken">Rücken</option>
+      <option value="Bizeps">Bizeps</option>
+      <option value="Cardio">Cardio</option>
+      <option value="Sonstige">Sonstige</option>
+    </select>
     <div class="btn-row">
       <button class="btn-secondary" onclick="hideAddForm()">Abbrechen</button>
       <button class="btn-primary" onclick="saveNewExercise()">Speichern →</button>
@@ -848,8 +913,10 @@
   const SUPABASE_URL = 'https://bbkxvrhmppgakqmydyms.supabase.co';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJia3h2cmhtcHBnYWtxbXlkeW1zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3MTAwMDEsImV4cCI6MjA5MDI4NjAwMX0.CkHonwg2m9e60STtDi-HuMrKVL4BLzRVNkxiXvYbyGc';
 
-  // Die Tabelle in die wir schreiben (muss in Supabase existieren)
-  const TABLE = 'training';
+  // Die Tabellen in die wir schreiben (müssen in Supabase existieren)
+  const TABLE       = 'training';
+  const PLANS_URL   = `${SUPABASE_URL}/rest/v1/trainingsp%C3%A4ne`;
+  const PUE_URL     = `${SUPABASE_URL}/rest/v1/plan_uebungen`;
 
    // Supabase Client initialisieren (nutzt die JS SDK)
   // Dieser Client kümmert sich um Login, Session, Token – alles automatisch
@@ -1046,10 +1113,16 @@
   // Kein hardcoded EXERCISES mehr – alles kommt aus Supabase
   // state.allExercises wird nach Login pro Trainingsart befüllt
 
+  const MG_ICONS = {
+    Beine: '🦵', Schultern: '🏋️', Brust: '💪', Trizeps: '🔱',
+    Rücken: '🔙', Bizeps: '💪', Cardio: '🏃', Sonstige: '🔧'
+  };
+  const MG_ORDER = ['Beine', 'Schultern', 'Brust', 'Trizeps', 'Rücken', 'Bizeps', 'Cardio', 'Sonstige'];
+
   let state = {
     nutzer: null,
-    token:  null,          // JWT Token von Supabase Auth
-    userId: null,          // UUID des eingeloggten Users
+    token:  null,
+    userId: null,
     theme:  'dark',
     type: null,
     currentExercise: null,
@@ -1058,6 +1131,8 @@
     customExercises: [],
     allExercises: {},
     lastSession: null,
+    currentPlanId: null,
+    currentPlanExercises: [],
     dp: { aktiv: false, minWdh: 8, maxWdh: 12, ausnahmen: [] }
   };
 
@@ -1205,14 +1280,8 @@
     // Übungen laden
     await loadAllExercises();
 
-    // Übungsanzahl auf Karten setzen
-    ['Beine/Schultern', 'Brust/Trizeps', 'Rücken/Bizeps', 'Cardio'].forEach(art => {
-      const anzahl = (state.allExercises[art] || []).length;
-      const el = document.getElementById('count-' + art);
-      if (el) el.textContent = anzahl + ' Übungen';
-    });
-
     showLoggedInButtons();
+    renderTypeScreen(); // Karten dynamisch rendern (async, fire & forget)
 
     // Laufende Session wiederherstellen?
     if (restoreSessionCache()) {
@@ -1256,8 +1325,8 @@
   async function loadAllExercises() {
     try {
       const url = `${SUPABASE_URL}/rest/v1/uebungen`
-        + `?select=name,trainingsart`
-        + `&order=created_at.asc`;
+        + `?select=name,muskelgruppe`
+        + `&order=name.asc`;
 
       const res = await fetch(url, { headers });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1265,10 +1334,9 @@
 
       state.allExercises = {};
       data.forEach(row => {
-        if (!state.allExercises[row.trainingsart]) {
-          state.allExercises[row.trainingsart] = [];
-        }
-        state.allExercises[row.trainingsart].push(row.name);
+        const mg = row.muskelgruppe || 'Sonstige';
+        if (!state.allExercises[mg]) state.allExercises[mg] = [];
+        state.allExercises[mg].push(row.name);
       });
     } catch (err) {
       console.error('Übungen laden fehlgeschlagen:', err);
@@ -1289,16 +1357,125 @@
     document.getElementById('navBackExercise').style.display   = hasActive ? 'block' : 'none';
   }
 
+  // ── Type-Screen dynamisch rendern ────────────────────────
+  async function renderTypeScreen() {
+    const container = document.getElementById('typeCardsContainer');
+    if (!container) return;
+
+    // Pläne laden (mit Übungsanzahl via eingebetteter Ressource)
+    let plans = [];
+    try {
+      const res = await fetch(`${PLANS_URL}?select=id,name,plan_uebungen(count)&order=erstellt_at.desc`, { headers });
+      if (res.ok) plans = await res.json();
+    } catch {}
+
+    container.innerHTML = '';
+
+    // 1. "Alle Übungen" Karte
+    const alleCard = document.createElement('div');
+    alleCard.className = 'type-card-full';
+    const alleIcon = document.createElement('div');
+    alleIcon.className = 'icon'; alleIcon.textContent = '📋';
+    const alleInfo = document.createElement('div');
+    alleInfo.innerHTML = '<div class="name">Alle Übungen</div><div class="sub">Übersicht &amp; verwalten</div>';
+    alleCard.appendChild(alleIcon); alleCard.appendChild(alleInfo);
+    alleCard.onclick = openAllExercises;
+    container.appendChild(alleCard);
+
+    // 2. Muskelgruppen-Karten (sortiert nach MG_ORDER)
+    const allKeys  = Object.keys(state.allExercises);
+    const ordered  = [...MG_ORDER.filter(k => allKeys.includes(k)), ...allKeys.filter(k => !MG_ORDER.includes(k))];
+    ordered.forEach(mg => {
+      const count = (state.allExercises[mg] || []).length;
+      const card  = document.createElement('div');
+      card.className = 'type-card';
+      const icon = document.createElement('div'); icon.className = 'icon'; icon.textContent = MG_ICONS[mg] || '🔧';
+      const name = document.createElement('div'); name.className = 'name'; name.textContent = mg;
+      const sub  = document.createElement('div'); sub.className  = 'sub';  sub.textContent  = count + ' Übungen';
+      card.appendChild(icon); card.appendChild(name); card.appendChild(sub);
+      card.onclick = () => selectType(mg);
+      container.appendChild(card);
+    });
+
+    // 3. Pläne
+    if (plans.length) {
+      const sep = document.createElement('div');
+      sep.style.cssText = 'font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:8px 0 4px;';
+      sep.textContent = 'Meine Trainingspläne';
+      container.appendChild(sep);
+
+      plans.forEach(plan => {
+        const uebCount = plan.plan_uebungen?.[0]?.count ?? 0;
+        const card = document.createElement('div');
+        card.className = 'plan-card';
+
+        const infoDiv = document.createElement('div');
+        const nameEl  = document.createElement('div'); nameEl.className = 'plan-name';
+        nameEl.textContent = '🗓️ ' + plan.name;
+        const subEl   = document.createElement('div'); subEl.className  = 'plan-sub';
+        subEl.textContent  = uebCount + ' Übungen';
+        infoDiv.appendChild(nameEl); infoDiv.appendChild(subEl);
+
+        const delBtn = document.createElement('span');
+        delBtn.style.cssText = 'color:var(--accent2);font-size:1.2rem;padding:4px 8px;flex-shrink:0;cursor:pointer;';
+        delBtn.textContent = '✕';
+        delBtn.onclick = (e) => { e.stopPropagation(); deletePlan(plan.id, plan.name); };
+
+        card.appendChild(infoDiv); card.appendChild(delBtn);
+        card.onclick = () => selectPlan(plan.id, plan.name);
+        container.appendChild(card);
+      });
+    }
+
+    // 4. "+ Neuer Trainingsplan" Button
+    const newBtn = document.createElement('button');
+    newBtn.className = 'btn-secondary';
+    newBtn.style.borderStyle = 'dashed';
+    newBtn.textContent = '+ Neuer Trainingsplan';
+    newBtn.onclick = showPlanScreen;
+    container.appendChild(newBtn);
+  }
+
+  function backToMain() {
+    renderTypeScreen();
+    showScreen('screen-type');
+  }
+
   async function selectType(type) {
     state.type = type;
+    state.currentPlanId       = null;
+    state.currentPlanExercises = [];
     state.currentExercise = null;
     state.currentSets = [];
     state.completedExercises = [];
     saveSessionCache();
 
-    // Eigene Übungen für diese Trainingsart laden
+    // Übungen für diese Muskelgruppe laden
     await loadCustomExercises();
 
+    renderExerciseButtons();
+    updateExerciseScreenUI();
+    document.getElementById('setInputSection').style.display  = 'none';
+    document.getElementById('goSummaryBtn').style.display     = 'none';
+    document.getElementById('goSummaryBtnIdle').style.display = 'none';
+    document.getElementById('addExerciseForm').style.display  = 'none';
+    showScreen('screen-exercise');
+  }
+
+  async function selectPlan(planId, planName) {
+    state.type             = planName;
+    state.currentPlanId    = planId;
+    state.currentExercise  = null;
+    state.currentSets      = [];
+    state.completedExercises = [];
+
+    // Plan-Übungen laden (sortiert nach position)
+    try {
+      const res = await fetch(`${PUE_URL}?plan_id=eq.${planId}&order=position.asc`, { headers });
+      state.currentPlanExercises = res.ok ? await res.json() : [];
+    } catch { state.currentPlanExercises = []; }
+
+    saveSessionCache();
     renderExerciseButtons();
     updateExerciseScreenUI();
     document.getElementById('setInputSection').style.display  = 'none';
@@ -1311,8 +1488,10 @@
   // Zurück zur Trainingsartauswahl (ohne completedExercises zu löschen
   // falls jemand Ganzkörper macht und Trainingsart wechseln will)
   function backToType() {
-    state.currentExercise = null;
-    state.currentSets = [];
+    state.currentExercise      = null;
+    state.currentSets          = [];
+    state.currentPlanId        = null;
+    state.currentPlanExercises = [];
     document.getElementById('setInputSection').style.display = 'none';
     document.getElementById('addExerciseForm').style.display = 'none';
     showScreen('screen-type');
@@ -1326,12 +1505,49 @@
   // falls vorhanden ("Zuletzt: 80 kg × 8")
 
   function renderExerciseButtons() {
-    const container  = document.getElementById('exerciseButtons');
-    // Übungen kommen jetzt komplett aus Supabase (state.allExercises)
-    const exercises  = state.allExercises[state.type] || [];
-    const doneNames  = state.completedExercises.map(e => e.name);
+    const container = document.getElementById('exerciseButtons');
+    const doneNames = state.completedExercises.map(e => e.name);
     container.innerHTML = '';
 
+    if (state.currentPlanId) {
+      // ── Plan-Modus: geordnete Übungen mit Drag & Drop ──
+      state.currentPlanExercises.forEach((planEx, idx) => {
+        const ex = planEx.uebung_name;
+
+        const row = document.createElement('div');
+        row.className = 'exercise-row';
+
+        const handle = document.createElement('span');
+        handle.className = 'drag-handle';
+        handle.textContent = '⠿';
+
+        const btn = document.createElement('button');
+        btn.className = 'exercise-btn' + (doneNames.includes(ex) ? ' selected' : '');
+        btn.style.flex = '1';
+
+        if (doneNames.includes(ex)) {
+          const done = state.completedExercises.find(e => e.name === ex);
+          btn.innerHTML = `✓ ${ex} <span style="color:var(--muted);font-size:0.8rem">(${done.sets.length} Sätze)</span>`;
+        } else {
+          btn.textContent = ex;
+          btn.onclick = () => selectExercise(ex);
+        }
+
+        row.draggable = true;
+        row.ondragstart  = e => onPlanDragStart(e, idx);
+        row.ondragover   = e => onPlanDragOver(e, row);
+        row.ondragleave  = () => row.classList.remove('drag-over');
+        row.ondrop       = e => onPlanDrop(e, idx);
+
+        row.appendChild(handle);
+        row.appendChild(btn);
+        container.appendChild(row);
+      });
+      return; // kein "+ Hinzufügen" im Plan-Modus
+    }
+
+    // ── Normaler Muskelgruppen-Modus ──
+    const exercises = state.allExercises[state.type] || [];
     exercises.forEach(ex => {
       const wrapper = document.createElement('div');
       wrapper.style.marginBottom = '8px';
@@ -1340,10 +1556,9 @@
       btn.className = 'exercise-btn' + (doneNames.includes(ex) ? ' selected' : '');
 
       if (editMode) {
-        // Edit-Modus: Löschen-Button zeigen
-        btn.style.display             = 'grid';
+        btn.style.display = 'grid';
         btn.style.gridTemplateColumns = '1fr auto';
-        btn.style.alignItems          = 'center';
+        btn.style.alignItems = 'center';
         const nameSpan = document.createElement('span');
         nameSpan.style.textAlign = 'left';
         nameSpan.textContent = ex;
@@ -1354,39 +1569,72 @@
         btn.appendChild(nameSpan);
         btn.appendChild(delSpan);
       } else if (doneNames.includes(ex)) {
-        // Übung bereits abgeschlossen
-        btn.innerHTML = `✓ ${ex} <span style="color:var(--muted);font-size:0.8rem">(${state.completedExercises.find(e=>e.name===ex).sets.length} Sätze)</span>`;
+        const done = state.completedExercises.find(e => e.name === ex);
+        btn.innerHTML = `✓ ${ex} <span style="color:var(--muted);font-size:0.8rem">(${done.sets.length} Sätze)</span>`;
       } else {
-        // Normal: Übung wählbar
-        btn.innerHTML = ex;
-        btn.onclick   = () => selectExercise(ex);
+        btn.textContent = ex;
+        btn.onclick = () => selectExercise(ex);
       }
-      
+
       wrapper.appendChild(btn);
       container.appendChild(wrapper);
     });
 
-    // "+ Übung hinzufügen" Button immer am Ende
-    // Beide Buttons nebeneinander in einer Zeile
     const btnRow = document.createElement('div');
     btnRow.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;';
-    
+
     const addBtn = document.createElement('button');
     addBtn.className = 'btn-secondary';
     addBtn.style.borderStyle = 'dashed';
     addBtn.textContent = '+ Hinzufügen';
-    addBtn.onclick = showAddForm;
-    
+    addBtn.onclick = () => showAddForm(state.type);
+
     const editBtn = document.createElement('button');
     editBtn.className = 'btn-secondary';
     editBtn.id = 'editModeBtn';
     editBtn.textContent = editMode ? 'Fertig ✓' : 'Bearbeiten';
     editBtn.onclick = toggleEditMode;
     if (editMode) editBtn.classList.add('active');
-    
+
     btnRow.appendChild(addBtn);
     btnRow.appendChild(editBtn);
     container.appendChild(btnRow);
+  }
+
+  // Drag & Drop Hilfsfunktionen für Plan-Modus
+  let planDragSrcIdx = null;
+
+  function onPlanDragStart(e, idx) {
+    planDragSrcIdx = idx;
+    e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function onPlanDragOver(e, el) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    el.classList.add('drag-over');
+  }
+
+  async function onPlanDrop(e, idx) {
+    e.preventDefault();
+    document.querySelectorAll('.exercise-row.drag-over').forEach(el => el.classList.remove('drag-over'));
+    if (planDragSrcIdx === null || planDragSrcIdx === idx) { planDragSrcIdx = null; return; }
+    const arr = state.currentPlanExercises;
+    const [moved] = arr.splice(planDragSrcIdx, 1);
+    arr.splice(idx, 0, moved);
+    planDragSrcIdx = null;
+    renderExerciseButtons();
+    await savePlanOrder();
+  }
+
+  async function savePlanOrder() {
+    await Promise.all(state.currentPlanExercises.map((ex, idx) =>
+      fetch(`${PUE_URL}?id=eq.${ex.id}`, {
+        method: 'PATCH',
+        headers: { ...headers, 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ position: idx })
+      })
+    ));
   }
 
   // ═══════════════════════════════════════════════════════
@@ -1398,12 +1646,15 @@
     await loadAllExercises();
   }
 
-  // Formular einblenden
-  function showAddForm() {
+  // Formular einblenden; mg = Muskelgruppe zur Vorauswahl
+  function showAddForm(mg) {
     document.getElementById('addExerciseForm').style.display = 'flex';
     document.getElementById('newExerciseName').value = '';
+    // Muskelgruppe vorausfüllen: übergebener Wert oder aktueller state.type
+    const sel = document.getElementById('newExerciseMg');
+    const target = mg || state.type || 'Sonstige';
+    sel.value = [...sel.options].some(o => o.value === target) ? target : 'Sonstige';
     document.getElementById('newExerciseName').focus();
-    // Zum Formular scrollen
     setTimeout(() => {
       document.getElementById('addExerciseForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
@@ -1449,16 +1700,12 @@
       if (!res.ok) throw new Error();
 
       // Lokal aus state.allExercises entfernen
-      // filter() gibt ein neues Array zurück ohne das gelöschte Element
-      state.allExercises[state.type] = state.allExercises[state.type]
-        .filter(ex => ex !== name);
-
-      // Anzahl auf Trainingsart-Karte aktualisieren
-      const anzahl = state.allExercises[state.type].length;
-      const countEl = document.getElementById('count-' + state.type);
-      if (countEl) countEl.textContent = anzahl + ' Übungen';
+      Object.keys(state.allExercises).forEach(mg => {
+        state.allExercises[mg] = state.allExercises[mg].filter(ex => ex !== name);
+      });
 
       renderExerciseButtons();
+      renderTypeScreen();  // Kartenanzahl aktualisieren (fire & forget)
       showToast(`"${name}" gelöscht`, 'success');
 
     } catch {
@@ -1508,29 +1755,30 @@
   // Neue Übung in Supabase speichern
   async function saveNewExercise() {
     const name = document.getElementById('newExerciseName').value.trim();
+    const mg   = document.getElementById('newExerciseMg').value;
     if (!name) { showToast('Bitte einen Namen eingeben', 'error'); return; }
 
-    // Doppelte verhindern
-    const alle = state.allExercises[state.type] || [];
-    if (alle.includes(name)) { showToast('Übung existiert bereits', 'error'); return; }
+    // Doppelte verhindern (über alle Gruppen)
+    const allNames = Object.values(state.allExercises).flat();
+    if (allNames.includes(name)) { showToast('Übung existiert bereits', 'error'); return; }
 
     try {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/uebungen`, {
         method: 'POST',
         headers,
-        body:   JSON.stringify({
-          name:         name,
-          trainingsart: state.type,
-          // nutzer wird automatisch vom Supabase Trigger gesetzt
+        body: JSON.stringify({
+          name,
+          muskelgruppe: mg,
+          trainingsart: mg,  // Rückwärtskompatibilität
         })
       });
 
       if (!res.ok) throw new Error();
 
-      // Übungen neu laden und Buttons aktualisieren
       await loadAllExercises();
       hideAddForm();
       renderExerciseButtons();
+      renderTypeScreen();  // Karten-Anzahl aktualisieren (fire & forget)
       showToast(`✓ "${name}" hinzugefügt`, 'success');
 
     } catch {
@@ -1866,7 +2114,7 @@
   function resetAll() {
     clearSessionCache();
     const currentTheme = state.theme;
-    state = { nutzer: null, token: null, userId: null, theme: currentTheme, type: null, currentExercise: null, currentSets: [], completedExercises: [], customExercises: [], allExercises: {}, lastSession: null, dp: { aktiv: false, minWdh: 8, maxWdh: 12, ausnahmen: [] } };
+    state = { nutzer: null, token: null, userId: null, theme: currentTheme, type: null, currentExercise: null, currentSets: [], completedExercises: [], customExercises: [], allExercises: {}, lastSession: null, currentPlanId: null, currentPlanExercises: [], dp: { aktiv: false, minWdh: 8, maxWdh: 12, ausnahmen: [] } };
     // Auth Header zurücksetzen
     headers['Authorization'] = `Bearer ${SUPABASE_KEY}`;
     // Login-Felder leeren
@@ -1888,10 +2136,12 @@
 
   function saveSessionCache() {
     const cache = {
-      type:               state.type,
-      currentExercise:    state.currentExercise,
-      currentSets:        state.currentSets,
-      completedExercises: state.completedExercises,
+      type:                 state.type,
+      currentExercise:      state.currentExercise,
+      currentSets:          state.currentSets,
+      completedExercises:   state.completedExercises,
+      currentPlanId:        state.currentPlanId,
+      currentPlanExercises: state.currentPlanExercises,
     };
     sessionStorage.setItem('trainingSession', JSON.stringify(cache));
   }
@@ -1902,10 +2152,12 @@
       if (!raw) return false;
       const cache = JSON.parse(raw);
       if (!cache.type) return false;
-      state.type               = cache.type;
-      state.currentExercise    = cache.currentExercise;
-      state.currentSets        = cache.currentSets        || [];
-      state.completedExercises = cache.completedExercises || [];
+      state.type                 = cache.type;
+      state.currentExercise      = cache.currentExercise;
+      state.currentSets          = cache.currentSets          || [];
+      state.completedExercises   = cache.completedExercises   || [];
+      state.currentPlanId        = cache.currentPlanId        || null;
+      state.currentPlanExercises = cache.currentPlanExercises || [];
       return true;
     } catch(e) { return false; }
   }
@@ -1961,9 +2213,9 @@
   function showStats() {
     const select = document.getElementById('statsExerciseSelect');
     select.innerHTML = '<option value="">– Übung wählen –</option>';
-    const arten = ['Beine/Schultern', 'Brust/Trizeps', 'Rücken/Bizeps', 'Cardio'];
+    const arten = [...MG_ORDER.filter(k => state.allExercises[k]), ...Object.keys(state.allExercises).filter(k => !MG_ORDER.includes(k))];
     arten.forEach(art => {
-      const uebungen = (state.allExercises[art] || []).slice().sort();
+      const uebungen = (state.allExercises[art] || []).slice();
       if (!uebungen.length) return;
       const group = document.createElement('optgroup');
       group.label = art;
@@ -2384,6 +2636,173 @@
   // ═══════════════════════════════════════════════════════
 
   // ═══════════════════════════════════════════════════════
+  // ALLE ÜBUNGEN (screen-alle)
+  // ═══════════════════════════════════════════════════════
+
+  function openAllExercises() {
+    renderAllExercises();
+    showScreen('screen-alle');
+  }
+
+  function renderAllExercises() {
+    const container = document.getElementById('alleUebungenContainer');
+    container.innerHTML = '';
+
+    const allKeys = Object.keys(state.allExercises);
+    const ordered = [...MG_ORDER.filter(k => allKeys.includes(k)), ...allKeys.filter(k => !MG_ORDER.includes(k))];
+
+    ordered.forEach(mg => {
+      const exercises = (state.allExercises[mg] || []).slice();
+
+      const section = document.createElement('div');
+      section.className = 'mg-section';
+
+      const header = document.createElement('div');
+      header.className = 'mg-section-header';
+      const titleEl = document.createElement('div'); titleEl.className = 'mg-title';
+      titleEl.textContent = (MG_ICONS[mg] || '🔧') + ' ' + mg;
+      const countEl = document.createElement('div'); countEl.className = 'mg-count';
+      countEl.textContent = exercises.length + ' Übungen ›';
+      header.appendChild(titleEl); header.appendChild(countEl);
+
+      const body = document.createElement('div');
+      body.className = 'mg-section-body hidden';
+
+      exercises.forEach(ex => {
+        const row = document.createElement('div');
+        row.style.cssText = 'padding:8px 4px;border-bottom:1px solid var(--border);font-size:0.9rem;color:var(--text);';
+        row.textContent = ex;
+        body.appendChild(row);
+      });
+
+      const addBtn = document.createElement('button');
+      addBtn.className = 'btn-secondary';
+      addBtn.style.cssText = 'margin-top:8px;border-style:dashed;';
+      addBtn.textContent = '+ Übung hinzufügen';
+      addBtn.onclick = async () => {
+        await selectType(mg);
+        showAddForm(mg);
+      };
+      body.appendChild(addBtn);
+
+      header.onclick = () => {
+        const open = !body.classList.contains('hidden');
+        body.classList.toggle('hidden', open);
+        header.classList.toggle('open', !open);
+      };
+
+      section.appendChild(header);
+      section.appendChild(body);
+      container.appendChild(section);
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // TRAININGSPLAN ERSTELLEN (screen-plan-erstellen)
+  // ═══════════════════════════════════════════════════════
+
+  function showPlanScreen() {
+    document.getElementById('planName').value = '';
+    renderPlanUebungenPicker();
+    showScreen('screen-plan-erstellen');
+  }
+
+  function renderPlanUebungenPicker() {
+    const container = document.getElementById('planUebungenPicker');
+    container.innerHTML = '';
+
+    const allKeys = Object.keys(state.allExercises);
+    const ordered = [...MG_ORDER.filter(k => allKeys.includes(k)), ...allKeys.filter(k => !MG_ORDER.includes(k))];
+
+    ordered.forEach(mg => {
+      const exercises = (state.allExercises[mg] || []).slice();
+      if (!exercises.length) return;
+
+      const section = document.createElement('div');
+      section.className = 'mg-section';
+
+      const header = document.createElement('div');
+      header.className = 'mg-section-header';
+      const titleEl = document.createElement('div'); titleEl.className = 'mg-title';
+      titleEl.textContent = (MG_ICONS[mg] || '🔧') + ' ' + mg;
+      const countEl = document.createElement('div'); countEl.className = 'mg-count';
+      countEl.textContent = exercises.length + ' ›';
+      header.appendChild(titleEl); header.appendChild(countEl);
+
+      const body = document.createElement('div');
+      body.className = 'mg-section-body hidden';
+
+      exercises.forEach(ex => {
+        const label = document.createElement('label');
+        label.style.cssText = 'display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--border);cursor:pointer;font-size:0.9rem;';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.value = ex; cb.name = 'planExercise';
+        cb.style.cssText = 'width:18px;height:18px;accent-color:var(--accent);flex-shrink:0;';
+        const span = document.createElement('span'); span.textContent = ex;
+        label.appendChild(cb); label.appendChild(span);
+        body.appendChild(label);
+      });
+
+      header.onclick = () => {
+        const open = !body.classList.contains('hidden');
+        body.classList.toggle('hidden', open);
+        header.classList.toggle('open', !open);
+      };
+
+      section.appendChild(header);
+      section.appendChild(body);
+      container.appendChild(section);
+    });
+  }
+
+  async function saveNewPlan() {
+    const name = document.getElementById('planName').value.trim();
+    if (!name) { showToast('Bitte einen Plannamen eingeben', 'error'); return; }
+
+    const checked = [...document.querySelectorAll('input[name="planExercise"]:checked')];
+    if (!checked.length) { showToast('Bitte mindestens eine Übung wählen', 'error'); return; }
+
+    try {
+      // 1. Plan in trainingspläne anlegen
+      const planRes = await fetch(PLANS_URL, {
+        method:  'POST',
+        headers: { ...headers, 'Prefer': 'return=representation' },
+        body:    JSON.stringify({ name })
+      });
+      if (!planRes.ok) throw new Error(`HTTP ${planRes.status}`);
+      const plans  = await planRes.json();
+      const planId = plans[0]?.id;
+      if (!planId) throw new Error('Keine Plan-ID');
+
+      // 2. Übungen in plan_uebungen speichern
+      const uebungen = checked.map((cb, idx) => ({ plan_id: planId, uebung_name: cb.value, position: idx }));
+      const uebRes = await fetch(PUE_URL, {
+        method:  'POST',
+        headers: { ...headers, 'Prefer': 'return=minimal' },
+        body:    JSON.stringify(uebungen)
+      });
+      if (!uebRes.ok) throw new Error(`HTTP ${uebRes.status}`);
+
+      showToast(`✓ Plan "${name}" gespeichert`, 'success');
+      await renderTypeScreen();
+      showScreen('screen-type');
+    } catch (err) {
+      console.error(err);
+      showToast('Fehler beim Speichern', 'error');
+    }
+  }
+
+  async function deletePlan(planId, planName) {
+    const ok = await showConfirm(`Plan "${planName}" wirklich löschen?`);
+    if (!ok) return;
+    try {
+      await fetch(`${PLANS_URL}?id=eq.${planId}`, { method: 'DELETE', headers: { ...headers, 'Prefer': 'return=minimal' } });
+      showToast(`Plan gelöscht`, 'success');
+      renderTypeScreen();
+    } catch { showToast('Fehler beim Löschen', 'error'); }
+  }
+
+  // ═══════════════════════════════════════════════════════
   // DOUBLE PROGRESSION
   // ═══════════════════════════════════════════════════════
 
@@ -2447,18 +2866,24 @@
 
   function updateNavbar(screenId) {
     const stepMap = {
-      'screen-type':     ['done', 'active', '',       ''      ],
-      'screen-exercise': ['done', 'done',   'active', ''      ],
-      'screen-summary':  ['done', 'done',   'done',   'active'],
-      'screen-stats':    ['done', 'done',   'done',   'done'  ],
-      'screen-manual':   ['done', 'done',   'done',   'done'  ],
+      'screen-type':           ['done', 'active', '',       ''      ],
+      'screen-alle':           ['done', 'active', '',       ''      ],
+      'screen-plan-erstellen': ['done', 'active', '',       ''      ],
+      'screen-exercise':       ['done', 'done',   'active', ''      ],
+      'screen-summary':        ['done', 'done',   'done',   'active'],
+      'screen-stats':          ['done', 'done',   'done',   'done'  ],
+      'screen-manual':         ['done', 'done',   'done',   'done'  ],
     };
     const dots = stepMap[screenId] || [];
     document.getElementById('navSteps').innerHTML = dots
       .map(c => `<div class="step-dot${c ? ' ' + c : ''}"></div>`)
       .join('');
 
-    const onExercise = screenId === 'screen-exercise';
+    const onSecondary = screenId === 'screen-alle' || screenId === 'screen-plan-erstellen';
+    const onExercise  = screenId === 'screen-exercise';
+
+    document.getElementById('navBackMain').style.display =
+      onSecondary ? 'block' : 'none';
     document.getElementById('navBackType').style.display =
       onExercise ? 'block' : 'none';
     document.getElementById('navBackExercise').style.display =
