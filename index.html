@@ -2757,7 +2757,7 @@
       const planRes = await fetch(PLANS_URL, {
         method:  'POST',
         headers: { ...headers, 'Prefer': 'return=representation' },
-        body:    JSON.stringify({ name, nutzer: state.nutzer })
+        body:    JSON.stringify({ name, nutzer: state.userId })
       });
       if (!planRes.ok) throw new Error(`HTTP ${planRes.status}`);
       const plans  = await planRes.json();
